@@ -1,0 +1,75 @@
+import { _electron as electron, expect } from '@playwright/test';
+import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const token = randomUUID();
+const env = { ...process.env, JOB_AGENT_TOKEN: token, JOB_AGENT_USER_DATA: path.join(root, 'logs', `test-profile-${Date.now()}`) };
+delete env.ELECTRON_RUN_AS_NODE;
+delete env.JOB_AGENT_DEV_URL;
+let backend;
+let desktop;
+const errors = [];
+const startBackend = () => {
+  backend = spawn(path.join(root, 'backend/.venv/Scripts/python.exe'), ['-m', 'uvicorn', 'app.main:create_app', '--factory', '--host', '127.0.0.1', '--port', '8765'], { cwd: path.join(root, 'backend'), env, windowsHide: true, stdio: 'pipe' });
+  backend.stderr.on('data', () => {});
+};
+try {
+  const existing = await fetch('http://127.0.0.1:8765/health').catch(() => null);
+  if (existing) throw new Error('Close the running desktop preview before tests (port 8765).');
+  startBackend();
+  await expect.poll(async () => (await fetch('http://127.0.0.1:8765/health').catch(() => null))?.status, { timeout: 15000 }).toBe(200);
+  desktop = await electron.launch({ args: [path.join(root, 'client')], env, timeout: 20000 });
+  const ui = await desktop.firstWindow();
+  ui.on('pageerror', error => errors.push(error.message));
+  await expect(ui.getByRole('heading', { name: '发现下一份可能.' })).toBeVisible();
+  await expect.poll(() => ui.evaluate(() => window.desktop.snapshot().then(s => s.connected))).toBe(true);
+  await expect.poll(() => desktop.windows().length).toBe(2);
+  const web = desktop.windows().find(page => page !== ui);
+  await expect(web.getByText('好工作，')).toBeVisible();
+  const isolation = await web.evaluate(() => ({ require: typeof globalThis.require, bridge: typeof globalThis.desktop }));
+  expect(isolation).toEqual({ require: 'undefined', bridge: 'undefined' });
+  await ui.getByRole('button', { name: '恢复 Agent', exact: true }).click();
+  await expect.poll(() => ui.evaluate(() => window.desktop.snapshot().then(s => s.agent.status))).toBe('running');
+  await ui.getByRole('button', { name: '暂停 Agent', exact: true }).click();
+  await expect.poll(() => ui.evaluate(() => window.desktop.snapshot().then(s => s.agent.status))).toBe('paused');
+  await web.getByRole('link').filter({ hasText: 'Python 后端开发工程师' }).click();
+  await expect(web.getByRole('heading', { name: 'Python 后端开发工程师' })).toBeVisible();
+  await ui.getByRole('button', { name: '恢复 Agent', exact: true }).click();
+  await expect.poll(() => ui.evaluate(() => window.desktop.snapshot().then(s => s.agent.page.url))).toContain('#job/1');
+  await ui.getByRole('button', { name: '暂停 Agent', exact: true }).click();
+  await web.getByRole('link', { name: '模拟沟通 →' }).click();
+  await web.getByRole('textbox', { name: '模拟消息' }).fill('这是手动接管测试');
+  await web.getByRole('button', { name: '模拟发送' }).click();
+  await expect(web.getByText('这是手动接管测试')).toBeVisible();
+  await ui.getByRole('button', { name: '测试双向通信' }).click();
+  await expect.poll(() => ui.evaluate(() => window.desktop.snapshot().then(s => s.logs.some(l => l.text.includes('通信检查成功'))))).toBe(true);
+  const blocked = await ui.evaluate(() => window.desktop.navigate('https://example.com').then(() => false, () => true));
+  expect(blocked).toBe(true);
+  backend.kill();
+  await expect.poll(() => ui.evaluate(() => window.desktop.snapshot().then(s => s.connected)), { timeout: 10000 }).toBe(false);
+  await expect.poll(() => ui.evaluate(() => window.desktop.snapshot().then(s => s.agent.status))).toBe('paused');
+  startBackend();
+  await expect.poll(() => ui.evaluate(() => window.desktop.snapshot().then(s => s.connected)), { timeout: 15000 }).toBe(true);
+  expect(await ui.evaluate(() => window.desktop.snapshot().then(s => s.agent.status))).toBe('paused');
+  await ui.getByRole('button', { name: '模拟招聘站', exact: true }).click();
+  await expect(web.getByText('好工作，')).toBeVisible();
+  await ui.getByRole('button', { name: '恢复 Agent', exact: true }).click();
+  await expect.poll(() => ui.evaluate(() => window.desktop.snapshot().then(s => s.agent.status))).toBe('running');
+  await mkdir(path.join(root, 'logs'), { recursive: true });
+  const screenshot = await desktop.evaluate(async ({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    const image = await window.capturePage();
+    return image.toPNG().toString('base64');
+  });
+  await writeFile(path.join(root, 'logs/phase1-preview.png'), Buffer.from(screenshot, 'base64'));
+  await web.screenshot({ path: path.join(root, 'logs/mock-preview.png') });
+  expect(errors).toEqual([]);
+  console.log('PASS: desktop render, sandbox, browser navigation, pause/manual input, fresh resume, WebSocket roundtrip, navigation guard, disconnect/reconnect.');
+} finally {
+  if (desktop) await desktop.close();
+  if (backend && !backend.killed) backend.kill();
+}
