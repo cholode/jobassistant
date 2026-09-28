@@ -1,4 +1,4 @@
-param([switch]$Built)
+﻿param([switch]$Built)
 # 默认使用 Vite 开发服务器；传入 -Built 时加载编译后的静态页面。
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot

@@ -1,4 +1,4 @@
-param([string]$Version = '0.0.1')
+﻿param([string]$Version = '0.0.1')
 # 指定发布目录和产物版本；编译前需已安装开发依赖及 PyInstaller。
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
