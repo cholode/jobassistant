@@ -1,13 +1,15 @@
-import { app, BrowserWindow, WebContentsView, ipcMain, Menu, session } from 'electron';
+import { app, BrowserWindow, WebContentsView, ipcMain, Menu, session, dialog } from 'electron';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Snapshot } from '../shared/protocol.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const backend = 'http://127.0.0.1:8765';
-const home = `${backend}/mock/`;
-const token = process.env.JOB_AGENT_TOKEN;
+let backend = 'http://127.0.0.1:8765';
+let home = `${backend}/mock/`;
+const token = app.isPackaged ? randomUUID() + randomUUID() : process.env.JOB_AGENT_TOKEN;
+let backendProcess: ChildProcess | undefined;
 if (!token) throw new Error('Launch using scripts/dev.ps1 (JOB_AGENT_TOKEN missing)');
 if (process.env.JOB_AGENT_USER_DATA) app.setPath('userData', process.env.JOB_AGENT_USER_DATA);
 const allowedHosts = new Set(['www.zhipin.com', 'www.liepin.com', 'www.zhaopin.com', 'www.nowcoder.com']);
@@ -37,7 +39,7 @@ function allowed(url: string): boolean {
 function readPage() {
   if (!browser || browser.webContents.isDestroyed()) return;
   const wc = browser.webContents;
-  state.browser = { url: wc.getURL() || home, title: wc.getTitle() || '正在打开页面', loading: wc.isLoading(), canBack: wc.navigationHistory.canGoBack(), canForward: wc.navigationHistory.canGoForward() };
+  state.browser = { home, url: wc.getURL() || home, title: wc.getTitle() || '正在打开页面', loading: wc.isLoading(), canBack: wc.navigationHistory.canGoBack(), canForward: wc.navigationHistory.canGoForward() };
   publish();
 }
 function request(type: string, quiet = false): Promise<void> {
@@ -135,7 +137,37 @@ function registerIPC() {
   });
 }
 
+async function startBundledBackend() {
+  const child = spawn(path.join(process.resourcesPath, 'backend', 'job-agent-backend.exe'), [], {
+    env: { ...process.env, JOB_AGENT_TOKEN: token }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  backendProcess = child;
+  // Drain output so a long-running backend cannot block on a full pipe.
+  child.stderr?.on('data', () => {});
+  const port = await new Promise<number>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('后端启动超时')), 30000);
+    let output = '';
+    child.once('error', (error) => { clearTimeout(timer); reject(error); });
+    child.once('exit', () => { clearTimeout(timer); reject(new Error('后端启动失败')); });
+    child.stdout?.on('data', (chunk) => {
+      output = (output + String(chunk)).slice(-4096);
+      const match = output.match(/JOB_AGENT_PORT=(\d+)/);
+      if (match) { clearTimeout(timer); resolve(Number(match[1])); }
+    });
+  });
+  backend = `http://127.0.0.1:${port}`;
+  home = `${backend}/mock/`;
+  state.browser.url = home; state.browser.home = home;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    if (child.exitCode !== null) throw new Error('后端意外退出');
+    try { if ((await fetch(`${backend}/health`, { signal: AbortSignal.timeout(500) })).ok) return; } catch { /* wait for Uvicorn */ }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  throw new Error('后端未能就绪');
+}
+
 app.whenReady().then(async () => {
+  if (app.isPackaged) await startBundledBackend();
   Menu.setApplicationMenu(null);
   window = new BrowserWindow({ width: 1440, height: 940, minWidth: 1100, minHeight: 720, title: 'Job Agent · 求职工作台', backgroundColor: '#f6f7f9', show: false, webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   const isolatedSession = session.fromPartition('persist:recruitment');
@@ -179,6 +211,6 @@ app.whenReady().then(async () => {
   void browser.webContents.loadURL(home).catch(() => log('模拟站未启动，请检查后端', 'warning'));
   connect();
   heartbeat = setInterval(() => { if (state.connected) void request('ping', true).catch(() => {}); }, 15000);
-});
-app.on('before-quit', () => { quitting = true; clearTimeout(reconnect); clearInterval(heartbeat); socket?.close(); });
+}).catch((error: Error) => { dialog.showErrorBox('Job Agent 启动失败', error.message); app.quit(); });
+app.on('before-quit', () => { quitting = true; clearTimeout(reconnect); clearInterval(heartbeat); socket?.close(); backendProcess?.kill(); });
 app.on('window-all-closed', () => app.quit());

@@ -1,4 +1,4 @@
-export interface PageState { url: string; title: string; loading: boolean; canBack: boolean; canForward: boolean }
+export interface PageState { home?: string; url: string; title: string; loading: boolean; canBack: boolean; canForward: boolean }
 export interface AgentState { status: 'paused' | 'running'; mode: 'manual'; revision: number; page: { url: string; title: string } }
 export interface LogEntry { id: string; time: string; text: string; kind: 'info' | 'success' | 'warning' }
 export interface Snapshot { connected: boolean; agent: AgentState; browser: PageState; logs: LogEntry[]; latency: number | null }

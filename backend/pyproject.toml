@@ -1,6 +1,6 @@
 [project]
 name = "job-agent-backend"
-version = "0.1.0"
+version = "0.0.1"
 description = "Job Agent Desktop backend dependencies"
 requires-python = ">=3.12,<3.13"
 dependencies = [

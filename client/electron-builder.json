@@ -1,0 +1,10 @@
+{
+  "appId": "local.jobassistant.desktop",
+  "productName": "Job Agent",
+  "directories": { "output": "../release/v0.0.1" },
+  "files": ["dist/**/*", "dist-electron/**/*", "package.json"],
+  "extraResources": [{ "from": "../build/backend/job-agent-backend", "to": "backend" }],
+  "win": { "target": [{ "target": "portable", "arch": ["x64"] }], "signAndEditExecutable": false },
+  "artifactName": "Job-Agent-${version}-win-x64.exe",
+  "portable": { "requestExecutionLevel": "user" }
+}

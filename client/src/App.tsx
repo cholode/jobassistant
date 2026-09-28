@@ -44,6 +44,7 @@ export default function App() {
   const running = data?.agent.status === 'running';
   const connected = Boolean(data?.connected);
   const logs = data?.logs ?? [];
+  const platformLinks = links.map((link, index) => index === 0 && data?.browser.home ? { ...link, url: data.browser.home } : link);
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -64,7 +65,7 @@ export default function App() {
         <form className="addressbar" onSubmit={(event) => { event.preventDefault(); void run(() => window.desktop.navigate(url.startsWith('http') ? url : `https://${url}`)); }}>
           <button type="button" className="icon-button" aria-label="后退" disabled={!data?.browser.canBack} onClick={() => void run(() => window.desktop.browserAction('back'))}><ArrowLeft size={17}/></button><button type="button" className="icon-button" aria-label="前进" disabled={!data?.browser.canForward} onClick={() => void run(() => window.desktop.browserAction('forward'))}><ArrowRight size={17}/></button><button type="button" className="icon-button" aria-label="刷新" onClick={() => void run(() => window.desktop.browserAction('reload'))}><RefreshCw size={15} className={data?.browser.loading ? 'spin' : ''}/></button><div className="url-input"><LockKeyhole size={13}/><input aria-label="网页地址" value={url} onChange={(event) => setUrl(event.target.value)}/><button type="submit" aria-label="打开地址"><ArrowRight size={14}/></button></div>
         </form>
-        <div className="bookmarks">{links.map((link, index) => <button key={link.name} className={url.startsWith(link.url) ? 'current' : ''} onClick={() => void run(() => window.desktop.navigate(link.url))}><span className={`bookmark-dot dot-${index}`}/>{link.name}</button>)}<span className="bookmark-caption">平台快捷入口</span></div>
+        <div className="bookmarks">{platformLinks.map((link, index) => <button key={link.name} className={url.startsWith(link.url) ? 'current' : ''} onClick={() => void run(() => window.desktop.navigate(link.url))}><span className={`bookmark-dot dot-${index}`}/>{link.name}</button>)}<span className="bookmark-caption">平台快捷入口</span></div>
         <div className="browser-slot" ref={slot}/>
         <div className="browser-footer"><span><ShieldCheck size={13}/> 安全隔离的浏览环境</span><span>网页操作始终由你掌控</span></div>
       </section>
@@ -78,7 +79,7 @@ export default function App() {
         </> : <div className="activity-list"><div className="section-caption">本次会话 · {logs.length} 条事件<History size={14}/></div>{logs.map((entry) => <div className="event" key={entry.id}><i className={entry.kind}/><div><span>{entry.text}</span><small>{new Date(entry.time).toLocaleTimeString('zh-CN', { hour12: false })}</small></div></div>)}<p className="session-note">Phase 1 记录保存在内存中，最多展示 80 条。</p></div>}</div>
         <div className="copilot-footer"><ShieldCheck size={13}/>重要决定，始终由你确认。</div>
       </aside></div>
-      <footer className="statusbar"><span><i className={connected ? 'status-green' : 'status-gray'}/>{connected ? '系统就绪' : '服务离线'}<span className="status-separator">/</span>{running ? '工作流运行中' : '手动接管中'}</span><span><span className="keyboard">MANUAL</span> 网页可自由操作<span className="status-separator">·</span>v0.1.0</span></footer>
+      <footer className="statusbar"><span><i className={connected ? 'status-green' : 'status-gray'}/>{connected ? '系统就绪' : '服务离线'}<span className="status-separator">/</span>{running ? '工作流运行中' : '手动接管中'}</span><span><span className="keyboard">MANUAL</span> 网页可自由操作<span className="status-separator">·</span>v0.0.1</span></footer>
     </main>{(error || tip) && <div role="status" className={`toast ${error ? 'error' : ''}`} onClick={() => { setError(''); setTip(''); }}>{error || tip}<button aria-label="关闭提示">×</button></div>}
   </div>;
 }

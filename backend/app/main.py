@@ -31,7 +31,7 @@ def create_app(token: str | None = None) -> FastAPI:
     secret = token or os.environ.get("JOB_AGENT_TOKEN")
     if not secret:
         raise RuntimeError("JOB_AGENT_TOKEN is required; launch scripts/dev.ps1")
-    app = FastAPI(title="Job Agent Desktop", version="0.1.0")
+    app = FastAPI(title="Job Agent Desktop", version="0.0.1")
     state = {
         "status": "paused",
         "mode": "manual",
@@ -130,7 +130,7 @@ def create_app(token: str | None = None) -> FastAPI:
     app.mount(
         "/mock",
         StaticFiles(
-            directory=Path(__file__).resolve().parents[2] / "mock-site", html=True
+            directory=os.environ.get("JOB_AGENT_MOCK_DIR") or Path(__file__).resolve().parents[2] / "mock-site", html=True
         ),
         name="mock",
     )
