@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Snapshot } from '../shared/protocol.js';
+import { ElectronBrowserController } from './browser/ElectronBrowserController.js';
+import { BrowserRPCBridge } from './browser/BrowserRPCBridge.js';
 
 // 主进程负责原生窗口、招聘网页、后端连接；React 只通过预加载桥接调用它。
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -17,6 +19,7 @@ if (process.env.JOB_AGENT_USER_DATA) app.setPath('userData', process.env.JOB_AGE
 const allowedHosts = new Set(['www.zhipin.com', 'www.liepin.com', 'www.zhaopin.com', 'www.nowcoder.com']);
 let window: BrowserWindow;
 let browser: WebContentsView;
+let browserRPC: BrowserRPCBridge;
 let browserZoom = 1;
 let socket: WebSocket | undefined;
 let quitting = false;
@@ -72,10 +75,16 @@ function connect() {
   // WebSocket 首帧认证，随后接收状态；意外断连时暂停并安排重连。
   if (quitting) return;
   socket = new WebSocket(`${backend.replace('http', 'ws')}/ws`);
-  socket.onopen = () => socket?.send(JSON.stringify({ token }));
+  const connection = socket;
+  socket.onopen = () => connection.send(JSON.stringify({ token }));
   socket.onmessage = ({ data }) => {
     try {
       const message = JSON.parse(String(data));
+      if (message.type === 'browser_command') {
+        // 只读请求异步处理，不能阻塞心跳、暂停及其他状态消息。
+        void browserRPC.handleCommand(connection, message).catch(() => log('浏览器读取响应失败', 'warning'));
+        return;
+      }
       if (message.type === 'connected') {
         state.connected = true;
         state.agent = message.state;
@@ -131,6 +140,17 @@ function registerIPC() {
     });
   };
   handle('desktop:snapshot', () => state);
+  handle('browser:read', async () => {
+    if (!state.connected) throw new Error('后端尚未连接');
+    try {
+      const data = await browserRPC.readPage();
+      log(`页面已读取 · ${data.platform} · ${data.kind}`, 'success');
+      return data;
+    } catch (error) {
+      log('页面读取失败，请检查页面状态后重试', 'warning');
+      throw error;
+    }
+  });
   handle('browser:zoom', changeBrowserZoom);
   handle('browser:navigate', async (url: unknown) => {
     if (typeof url !== 'string' || !allowed(url)) throw new Error('仅允许本地模拟站及列表中的招聘网站（HTTPS）');
@@ -201,6 +221,9 @@ app.whenReady().then(async () => {
   isolatedSession.setPermissionCheckHandler(() => false);
   isolatedSession.on('will-download', (event) => { event.preventDefault(); log('Phase 1 暂不支持文件下载', 'warning'); });
   browser = new WebContentsView({ webPreferences: { session: isolatedSession, contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  // Phase 2 只开放读取；底层自动点击、输入和导航始终由写入开关拦截。
+  const controller = new ElectronBrowserController(browser.webContents, allowed, () => false);
+  browserRPC = new BrowserRPCBridge(controller, backend, token!);
   // 手动模式统一处理按钮与 Ctrl+滚轮，避免原生缩放和界面比例不一致。
   browser.webContents.setZoomMode('manual');
   browser.webContents.on('zoom-changed', (_event, direction) => changeBrowserZoom(direction));

@@ -1,3 +1,4 @@
+import type { PageReading } from './browser.js';
 // 主进程与工作台共用的通信类型；修改字段时需要同步两端的读写逻辑。
 // home 是模拟站入口，发布版端口动态分配，因此不能由界面硬编码。
 export interface PageState { home?: string; zoom: number; url: string; title: string; loading: boolean; canBack: boolean; canForward: boolean }
@@ -8,6 +9,7 @@ export interface LogEntry { id: string; time: string; text: string; kind: 'info'
 // 工作台每次接收完整快照；latency 为请求往返毫秒数，尚未测量或离线时为 null。
 export interface Snapshot { connected: boolean; agent: AgentState; browser: PageState; logs: LogEntry[]; latency: number | null }
 export interface DesktopAPI {
+  readPage(): Promise<PageReading>;
   // 获取初始快照；订阅函数返回取消订阅方法。
   snapshot(): Promise<Snapshot>;
   subscribe(callback: (state: Snapshot) => void): () => void;

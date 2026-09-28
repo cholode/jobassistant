@@ -41,6 +41,7 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "build": "tsc --noEmit && tsc -p tsconfig.electron.json && vite build",
     "test:desktop": "node tests/desktop.mjs",
+    "test:browser": "node --test tests/browser-rpc.mjs",
     "lint": "tsc --noEmit --noUnusedLocals --noUnusedParameters && tsc -p tsconfig.electron.json --noEmit --noUnusedLocals --noUnusedParameters"
   }
 }
