@@ -25,7 +25,7 @@ try {
   desktop = await electron.launch({ args: [path.join(root, 'client')], env, timeout: 20000 });
   const ui = await desktop.firstWindow();
   ui.on('pageerror', error => errors.push(error.message));
-  await expect(ui.getByRole('heading', { name: '发现下一份可能.' })).toBeVisible();
+  await expect(ui.getByRole('textbox', { name: '网页地址' })).toBeVisible();
   await expect.poll(() => ui.evaluate(() => window.desktop.snapshot().then(s => s.connected))).toBe(true);
   await expect.poll(() => desktop.windows().length).toBe(2);
   const web = desktop.windows().find(page => page !== ui);
