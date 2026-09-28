@@ -8,6 +8,7 @@ const useDesktop = create<{ snapshot: Snapshot | null; set: (snapshot: Snapshot)
 const links = [{ name: '模拟招聘站', url: 'http://127.0.0.1:8765/mock/' }, { name: 'BOSS 直聘', url: 'https://www.zhipin.com/' }, { name: '猎聘', url: 'https://www.liepin.com/' }, { name: '智联招聘', url: 'https://www.zhaopin.com/' }];
 
 export default function App() {
+  // 主进程快照是实际运行状态；本地 state 只管理输入、提示和界面选择。
   const { snapshot: data, set } = useDesktop();
   const slot = useRef<HTMLDivElement>(null);
   const [url, setUrl] = useState('http://127.0.0.1:8765/mock/');
@@ -17,18 +18,21 @@ export default function App() {
   const [tip, setTip] = useState('');
   useEffect(() => {
     let live = true;
+    // 先订阅后读取初始快照，并在卸载时取消订阅，避免留下监听器。
     const unsubscribe = window.desktop.subscribe((state) => { if (live) set(state); });
     void window.desktop.snapshot().then((state) => { if (live) set(state); });
     return () => { live = false; unsubscribe(); };
   }, [set]);
   useEffect(() => { if (data?.browser.url) setUrl(data.browser.url); }, [data?.browser.url]);
   useEffect(() => {
+    // 网页是原生 WebContentsView；这个占位元素的尺寸用于驱动其布局。
     const node = slot.current;
     if (!node) return;
     const update = () => {
       const { x, y, width, height } = node.getBoundingClientRect();
       void window.desktop.bounds({ x, y, width, height });
     };
+    // 同时监听区域尺寸和窗口变化，保证网页与工作台布局对齐。
     const observer = new ResizeObserver(update);
     observer.observe(node);
     window.addEventListener('resize', update);
@@ -37,6 +41,7 @@ export default function App() {
   }, []);
   useEffect(() => { if (!tip) return; const id = setTimeout(() => setTip(''), 5000); return () => clearTimeout(id); }, [tip]);
   const run = async (action: () => Promise<void>) => {
+    // 统一管理按钮等待状态与错误提示，具体操作交给主进程执行。
     setError(''); setBusy(true);
     try { await action(); } catch (error) { setError(error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': Error: /, '') : String(error)); }
     finally { setBusy(false); }
@@ -44,8 +49,10 @@ export default function App() {
   const running = data?.agent.status === 'running';
   const connected = Boolean(data?.connected);
   const logs = data?.logs ?? [];
+  // 发布版后端使用随机端口，模拟站快捷入口必须使用主进程提供的地址。
   const platformLinks = links.map((link, index) => index === 0 && data?.browser.home ? { ...link, url: data.browser.home } : link);
 
+  // 界面由左侧导航、中央浏览器占位区和右侧状态面板组成。
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark"><Command size={23}/></span><span>Job Agent<small>你的求职副驾驶</small></span></div>

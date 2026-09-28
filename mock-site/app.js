@@ -1,3 +1,4 @@
+// 本地演示数据，仅用于验证浏览与交互，不对应真实招聘信息。
 const jobs = [
   { id: '1', title: 'Python 后端开发工程师', salary: '20–35K · 14薪', city: '深圳', exp: '1–3年', company: '远山科技', icon: '山', stage: 'B轮 · 100–499人', tags: ['Python', 'FastAPI', 'AI 应用'], intro: '我们正在打造面向下一代开发者的 AI 工具，寻找喜欢解决真实问题的伙伴。', tasks: ['参与 AI 应用后端设计，开发稳定可靠的服务。', '使用 Python 与 FastAPI 构建接口，优化数据库和异步任务。', '与产品、前端工程师协作，持续改善用户体验。'] },
   { id: '2', title: 'AI 应用开发工程师', salary: '25–40K · 14薪', city: '上海', exp: '1–3年', company: '光年智能', icon: '光', stage: 'A轮 · 50–99人', tags: ['LangChain', 'LLM', 'Agent'], intro: '一起把大模型能力变成让用户每天都愿意使用的产品。', tasks: ['设计和实现 LLM 工作流。', '构建可观测、可测试的 Agent 系统。', '持续评估模型输出质量，优化用户体验。'] },
@@ -5,10 +6,13 @@ const jobs = [
 ];
 let city = '全部';
 let query = '';
+// 模拟消息只保存在内存中，刷新页面即清空，不向外部发送。
 const messages = [];
 const content = document.querySelector('#content');
+// 将输入作为文本展示，避免搜索词或聊天内容被当作 HTML 执行。
 const escapeHTML = value => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 function render() {
+  // 根据 URL 的 hash 展示列表、职位详情或模拟聊天，无需服务器路由。
   const hash = location.hash;
   if (hash.startsWith('#job/')) {
     const job = jobs.find(job => job.id === hash.split('/')[1]);
@@ -27,5 +31,6 @@ function render() {
     content.querySelectorAll('[data-city]').forEach(button => { button.onclick = () => { city = button.dataset.city; render(); }; });
   }
 }
+// 监听前进、后退和链接跳转，保持内容与当前地址一致。
 window.addEventListener('hashchange', render);
 render();

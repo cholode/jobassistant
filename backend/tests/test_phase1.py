@@ -1,8 +1,7 @@
 import pytest
+from app.main import create_app
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
-
-from app.main import create_app
 
 
 @pytest.fixture
@@ -70,3 +69,37 @@ def test_invalid_auth_and_origin(client):
         ),
     ):
         pass
+
+
+def test_app_instances_keep_state_and_auth_separate():
+    # 服务从闭包迁移为类后，各应用仍应独立保存令牌、连接和运行状态。
+    with (
+        TestClient(create_app("first")) as first,
+        TestClient(create_app("second")) as second,
+        first.websocket_connect("/ws") as ws,
+    ):
+        ws.send_json({"token": "first"})
+        ws.receive_json()
+        ws.send_json(
+            {
+                "type": "resume",
+                "request_id": "1",
+                "page": {"url": "https://example.com/job", "title": "Job"},
+            }
+        )
+        assert ws.receive_json()["state"]["status"] == "running"
+        assert (
+            second.get(
+                "/agent/state", headers={"X-Job-Agent-Token": "first"}
+            ).status_code
+            == 401
+        )
+        state = second.get(
+            "/agent/state", headers={"X-Job-Agent-Token": "second"}
+        ).json()
+        assert state["status"] == "paused"
+        assert state["revision"] == 0
+        assert state["page"] == {"url": "", "title": ""}
+        with second.websocket_connect("/ws") as other_ws:
+            other_ws.send_json({"token": "second"})
+            assert other_ws.receive_json()["type"] == "connected"

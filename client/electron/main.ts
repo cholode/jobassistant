@@ -5,9 +5,11 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Snapshot } from '../shared/protocol.js';
 
+// 主进程负责原生窗口、招聘网页、后端连接；React 只通过预加载桥接调用它。
 const here = path.dirname(fileURLToPath(import.meta.url));
 let backend = 'http://127.0.0.1:8765';
 let home = `${backend}/mock/`;
+// 发布版每次启动生成新令牌；开发版与启动脚本共享令牌。
 const token = app.isPackaged ? randomUUID() + randomUUID() : process.env.JOB_AGENT_TOKEN;
 let backendProcess: ChildProcess | undefined;
 if (!token) throw new Error('Launch using scripts/dev.ps1 (JOB_AGENT_TOKEN missing)');
@@ -19,17 +21,21 @@ let socket: WebSocket | undefined;
 let quitting = false;
 let reconnect: ReturnType<typeof setTimeout> | undefined;
 let heartbeat: ReturnType<typeof setInterval> | undefined;
+// 按请求编号保存等待中的操作，用于匹配响应、计算往返延迟和处理超时。
 const pending = new Map<string, { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>; start: number; type: string; quiet: boolean }>();
 const state: Snapshot = { connected: false, agent: { status: 'paused', mode: 'manual', revision: 0, page: { url: '', title: '' } }, browser: { url: home, title: '本地模拟招聘站', loading: true, canBack: false, canForward: false }, logs: [], latency: null };
 
 function publish() {
+  // 将状态快照推送给工作台，不向招聘网页暴露内部状态。
   if (window && !window.isDestroyed()) window.webContents.send('desktop:state', state);
 }
 function log(text: string, kind: 'info' | 'success' | 'warning' = 'info') {
+  // 运行记录仅存在内存中，保留最近 80 条，避免长时间运行持续占用内存。
   state.logs = [{ id: randomUUID(), time: new Date().toISOString(), text, kind }, ...state.logs].slice(0, 80);
   publish();
 }
 function allowed(url: string): boolean {
+  // 导航仅允许本地模拟站及指定 HTTPS 招聘域名，拒绝 URL 内嵌账号密码。
   try {
     const parsed = new URL(url);
     if (parsed.username || parsed.password) return false;
@@ -37,12 +43,14 @@ function allowed(url: string): boolean {
   } catch { return false; }
 }
 function readPage() {
+  // 从真实浏览视图读取地址、标题及历史导航状态，更新工作台显示。
   if (!browser || browser.webContents.isDestroyed()) return;
   const wc = browser.webContents;
   state.browser = { home, url: wc.getURL() || home, title: wc.getTitle() || '正在打开页面', loading: wc.isLoading(), canBack: wc.navigationHistory.canGoBack(), canForward: wc.navigationHistory.canGoForward() };
   publish();
 }
 function request(type: string, quiet = false): Promise<void> {
+  // 每次发送都先刷新页面信息；5 秒无响应则暂停并断开连接。
   if (!state.connected || socket?.readyState !== WebSocket.OPEN) return Promise.reject(new Error('后端尚未连接，请稍后重试'));
   readPage();
   const request_id = randomUUID();
@@ -60,6 +68,7 @@ function request(type: string, quiet = false): Promise<void> {
   });
 }
 function connect() {
+  // WebSocket 首帧认证，随后接收状态；意外断连时暂停并安排重连。
   if (quitting) return;
   socket = new WebSocket(`${backend.replace('http', 'ws')}/ws`);
   socket.onopen = () => socket?.send(JSON.stringify({ token }));
@@ -74,6 +83,7 @@ function connect() {
       } else if (message.type === 'agent_state' || message.type === 'pong') {
         state.agent = message.state;
       }
+      // 完成对应操作的 Promise，让前端结束等待状态。
       const task = pending.get(message.request_id);
       if (task) {
         clearTimeout(task.timer);
@@ -90,7 +100,7 @@ function connect() {
       publish();
     } catch { log('收到无法解析的后端消息', 'warning'); }
   };
-  socket.onerror = () => { /* onclose handles reconnect and fail-closed state. */ };
+  socket.onerror = () => { /* 统一由 onclose 负责暂停、清理和重连。 */ };
   socket.onclose = () => {
     state.connected = false;
     state.agent.status = 'paused';
@@ -104,6 +114,7 @@ function connect() {
   };
 }
 function registerIPC() {
+  // 仅接受工作台主框架发出的 IPC，防止网页或子框架调用本机能力。
   const handle = (channel: string, handler: (...args: any[]) => unknown) => {
     ipcMain.handle(channel, (event, ...args) => {
       if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame) throw new Error('Untrusted IPC sender');
@@ -124,6 +135,7 @@ function registerIPC() {
     else if (!['back', 'forward'].includes(String(action))) throw new Error('Unknown browser action');
   });
   handle('browser:bounds', (rect: { x: number; y: number; width: number; height: number }) => {
+    // React 上报占位区域；裁剪到窗口范围后设置原生网页视图的位置与尺寸。
     if (!rect || ![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) throw new Error('Invalid browser bounds');
     const [w, h] = window.getContentSize();
     const x = Math.max(0, Math.min(w, Math.round(rect.x)));
@@ -138,12 +150,14 @@ function registerIPC() {
 }
 
 async function startBundledBackend() {
+  // 启动打包的 Python 后端并隐藏控制台；开发模式无需执行此步骤。
   const child = spawn(path.join(process.resourcesPath, 'backend', 'job-agent-backend.exe'), [], {
     env: { ...process.env, JOB_AGENT_TOKEN: token }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
   });
   backendProcess = child;
-  // Drain output so a long-running backend cannot block on a full pipe.
+  // 持续读取错误输出，避免子进程因管道写满而阻塞。
   child.stderr?.on('data', () => {});
+  // 等待后端通过标准输出报告端口；收到端口不代表 HTTP 服务已经就绪。
   const port = await new Promise<number>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('后端启动超时')), 30000);
     let output = '';
@@ -158,6 +172,7 @@ async function startBundledBackend() {
   backend = `http://127.0.0.1:${port}`;
   home = `${backend}/mock/`;
   state.browser.url = home; state.browser.home = home;
+  // 再通过健康接口确认服务可用，之后才加载模拟站和建立 WebSocket。
   for (let attempt = 0; attempt < 100; attempt++) {
     if (child.exitCode !== null) throw new Error('后端意外退出');
     try { if ((await fetch(`${backend}/health`, { signal: AbortSignal.timeout(500) })).ok) return; } catch { /* wait for Uvicorn */ }
@@ -170,6 +185,7 @@ app.whenReady().then(async () => {
   if (app.isPackaged) await startBundledBackend();
   Menu.setApplicationMenu(null);
   window = new BrowserWindow({ width: 1440, height: 940, minWidth: 1100, minHeight: 720, title: 'Job Agent · 求职工作台', backgroundColor: '#f6f7f9', show: false, webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  // 招聘网页使用独立持久会话保存登录状态，与工作台隔离且不开放 Node.js。
   const isolatedSession = session.fromPartition('persist:recruitment');
   isolatedSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
   isolatedSession.setPermissionCheckHandler(() => false);
@@ -178,6 +194,7 @@ app.whenReady().then(async () => {
   browser.setBackgroundColor('#ffffff');
   window.contentView.addChildView(browser);
   browser.setBounds({ x: 232, y: 220, width: 700, height: 500 });
+  // 网页加载、标题变化与页内跳转都需要同步到工作台。
   browser.webContents.on('did-start-loading', readPage);
   browser.webContents.on('did-stop-loading', readPage);
   browser.webContents.on('did-navigate', readPage);
@@ -197,12 +214,14 @@ app.whenReady().then(async () => {
   browser.webContents.on('will-navigate', (event, url) => { if (!allowed(url)) { event.preventDefault(); log('已阻止未授权网页跳转', 'warning'); } });
   browser.webContents.on('will-redirect', (event, url) => { if (!allowed(url)) { event.preventDefault(); log('已阻止未授权网页重定向', 'warning'); } });
   browser.webContents.setWindowOpenHandler(({ url }) => {
+    // 新窗口请求改为在当前视图打开，继续应用域名限制。
     if (allowed(url)) void browser.webContents.loadURL(url).catch(() => log('新页面打开失败', 'warning'));
     else log('已阻止未授权的新窗口', 'warning');
     return { action: 'deny' };
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event) => event.preventDefault());
+  // 先注册通信接口，再加载开发服务器页面或打包后的本地页面。
   registerIPC();
   window.on('closed', () => { browser.webContents.close(); app.quit(); });
   if (process.env.JOB_AGENT_DEV_URL === 'http://127.0.0.1:5173') await window.loadURL(process.env.JOB_AGENT_DEV_URL);
@@ -212,5 +231,6 @@ app.whenReady().then(async () => {
   connect();
   heartbeat = setInterval(() => { if (state.connected) void request('ping', true).catch(() => {}); }, 15000);
 }).catch((error: Error) => { dialog.showErrorBox('Job Agent 启动失败', error.message); app.quit(); });
+// 退出时停止重连和心跳，并结束本应用启动的后端，避免残留后台进程。
 app.on('before-quit', () => { quitting = true; clearTimeout(reconnect); clearInterval(heartbeat); socket?.close(); backendProcess?.kill(); });
 app.on('window-all-closed', () => app.quit());
