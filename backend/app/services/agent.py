@@ -28,7 +28,7 @@ class AgentService:
     @staticmethod
     def health() -> dict:
         # 启动探测无需认证，也不返回用户状态。
-        return {"status": "ok", "service": "job-agent", "phase": 1}
+        return {"status": "ok", "service": "job-agent", "phase": 2}
 
     def valid_token(self, value: str | None) -> bool:
         # HTTP 和 WebSocket 共用令牌校验，各自决定认证失败时的响应方式。

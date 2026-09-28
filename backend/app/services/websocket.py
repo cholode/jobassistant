@@ -6,6 +6,8 @@ import logging
 from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
+from ..browser.client import BrowserRPCClient, BrowserRPCError
+from ..browser.protocol import BrowserResult
 from ..models import ClientMessage
 from .agent import AgentService
 
@@ -13,9 +15,10 @@ logger = logging.getLogger("job_agent")
 
 
 class WebSocketService:
-    def __init__(self, agent: AgentService):
+    def __init__(self, agent: AgentService, rpc: BrowserRPCClient):
         # 由应用工厂注入同一个 Agent 服务，使 HTTP 和 WebSocket 看到一致状态。
         self.agent = agent
+        self.rpc = rpc
         self.clients: set[WebSocket] = set()
         # 将连接登记、指令处理和断开清理串行化，避免协程交错修改状态。
         self.lock = asyncio.Lock()
@@ -41,23 +44,29 @@ class WebSocketService:
                     await ws.close(code=1008, reason="One desktop client at a time")
                     return
                 self.clients.add(ws)
-                await ws.send_json(self.agent.event("connected"))
+                self.rpc.attach(ws)
+                await self.rpc.send(self.agent.event("connected"))
             logger.info("Desktop connected")
             while True:
                 raw = await ws.receive_json()
                 try:
+                    # RPC 响应独立分流，不能当作 Agent 指令，也不能在这里等待 RPC。
+                    if isinstance(raw, dict) and raw.get("type") == "browser_result":
+                        self.rpc.receive(BrowserResult.model_validate(raw))
+                        continue
                     message = ClientMessage.model_validate(raw)
                 except ValidationError:
-                    await ws.send_json({"type": "error", "message": "Invalid message"})
+                    await self.rpc.send({"type": "error", "message": "Invalid message"})
                     continue
                 async with self.lock:
                     response = self.agent.handle_message(message)
-                    await ws.send_json(response)
-        except (WebSocketDisconnect, TimeoutError, ValueError):
+                    await self.rpc.send(response)
+        except (WebSocketDisconnect, TimeoutError, ValueError, BrowserRPCError):
             pass
         finally:
             async with self.lock:
                 # 只有认证成功并登记的连接断开才触发暂停。
                 if ws in self.clients:
                     self.clients.remove(ws)
+                    self.rpc.detach(ws)
                     self.agent.pause_on_disconnect()
