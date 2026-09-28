@@ -1,0 +1,18 @@
+import { Command, ChevronDown, Compass, BriefcaseBusiness, MessageSquare, SquareCheckBig, History, Settings2, ShieldCheck } from 'lucide-react';
+import type { PanelTab } from '../agent/AgentPanel';
+
+interface Props { tab: PanelTab; setTab: (tab: PanelTab) => void; logCount: number; setTip: (tip: string) => void }
+export function Sidebar({ tab, setTab, logCount, setTip }: Props) {
+  return <aside className="sidebar">
+      <div className="brand"><span className="brand-mark"><Command size={23}/></span><span>Job Agent<small>你的求职副驾驶</small></span></div>
+      <div className="workspace"><span className="avatar">W</span><div>个人工作空间<small>Local workspace</small></div><ChevronDown size={14}/></div>
+      <div className="nav-label">工作台</div>
+      <nav>
+        <button className="nav-item active" onClick={() => setTab('overview')}><Compass size={18}/>招聘浏览器<span className="nav-dot"/></button>
+        {[{ icon: BriefcaseBusiness, text: '职位收藏', phase: 'Phase 3' }, { icon: MessageSquare, text: '沟通消息', phase: 'Phase 5' }, { icon: SquareCheckBig, text: '待确认事项', phase: 'Phase 5' }].map(({ icon: Icon, text, phase }) => <button key={text} className="nav-item upcoming" onClick={() => setTip(`${text}将在 ${phase} 实现，当前可体验网页浏览与连接控制。`)}><Icon size={18}/>{text}<span className="soon">待开发</span></button>)}
+        <button className={`nav-item ${tab === 'activity' ? 'selected' : ''}`} onClick={() => setTab('activity')}><History size={18}/>运行记录<span className="count">{logCount}</span></button>
+      </nav>
+      <div className="sidebar-bottom"><div className="phase-card"><div><span className="tiny-dot"/> PHASE 02 <span>已就绪</span></div><strong>读取当前网页。</strong><p>浏览网页，连接后端，<br/>随时暂停并接管。</p><div className="phase-progress"><i/></div><small>网页读取与平台适配</small></div>
+      <button className="nav-item" onClick={() => setTip('Phase 2 使用 Manual 模式，无需配置模型 API Key。完整设置将在后续阶段开放。')}><Settings2 size={17}/>设置与偏好</button><div className="profile"><span className="profile-avatar">我</span><div>我的求职空间<small>数据保留在本机</small></div><ShieldCheck size={16}/></div></div>
+    </aside>;
+}

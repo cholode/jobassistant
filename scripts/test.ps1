@@ -14,6 +14,8 @@ try {
     Check-Exit
     pnpm.cmd run build
     Check-Exit
+    pnpm.cmd run test:browser
+    Check-Exit
     pnpm.cmd run test:desktop
     Check-Exit
 } finally { Pop-Location }
