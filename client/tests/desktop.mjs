@@ -30,6 +30,29 @@ try {
   await expect.poll(() => desktop.windows().length).toBe(2);
   const web = desktop.windows().find(page => page !== ui);
   await expect(web.getByText('好工作，')).toBeVisible();
+  // 同时检查控件比例和真实网页缩放，防止只更新界面数字。
+  const zoomFactors = () => desktop.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    return { shell: window.webContents.getZoomFactor(), page: window.contentView.children[0].webContents.getZoomFactor() };
+  });
+  await ui.getByRole('button', { name: '放大网页', exact: true }).click();
+  await expect(ui.getByRole('button', { name: '重置网页缩放' })).toHaveText('110%');
+  expect((await zoomFactors()).page).toBeCloseTo(1.1);
+  expect((await zoomFactors()).shell).toBe(1);
+  await ui.getByRole('button', { name: '缩小网页', exact: true }).click();
+  expect((await zoomFactors()).page).toBeCloseTo(1);
+  await ui.getByRole('button', { name: '缩小网页', exact: true }).click();
+  await ui.getByRole('button', { name: '刷新', exact: true }).click();
+  await expect(web.getByText('好工作，')).toBeVisible();
+  expect((await zoomFactors()).page).toBeCloseTo(0.9);
+  await ui.evaluate(async () => { for (let i = 0; i < 20; i++) await window.desktop.browserZoom('out'); });
+  await expect(ui.getByRole('button', { name: '缩小网页', exact: true })).toBeDisabled();
+  expect((await zoomFactors()).page).toBeCloseTo(0.5);
+  await ui.evaluate(async () => { for (let i = 0; i < 20; i++) await window.desktop.browserZoom('in'); });
+  await expect(ui.getByRole('button', { name: '放大网页', exact: true })).toBeDisabled();
+  expect((await zoomFactors()).page).toBeCloseTo(2);
+  await ui.getByRole('button', { name: '重置网页缩放' }).click();
+  expect((await zoomFactors()).page).toBeCloseTo(1);
   const isolation = await web.evaluate(() => ({ require: typeof globalThis.require, bridge: typeof globalThis.desktop }));
   expect(isolation).toEqual({ require: 'undefined', bridge: 'undefined' });
   await ui.getByRole('button', { name: '恢复 Agent', exact: true }).click();

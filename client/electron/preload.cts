@@ -10,6 +10,7 @@ const api: DesktopAPI = {
     return () => ipcRenderer.removeListener('desktop:state', listener);
   },
   navigate: (url) => ipcRenderer.invoke('browser:navigate', url),
+  browserZoom: (action) => ipcRenderer.invoke('browser:zoom', action),
   browserAction: (action) => ipcRenderer.invoke('browser:action', action),
   bounds: (bounds) => ipcRenderer.invoke('browser:bounds', bounds),
   agentAction: (action) => ipcRenderer.invoke('agent:action', action),

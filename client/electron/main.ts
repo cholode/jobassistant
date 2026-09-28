@@ -17,13 +17,14 @@ if (process.env.JOB_AGENT_USER_DATA) app.setPath('userData', process.env.JOB_AGE
 const allowedHosts = new Set(['www.zhipin.com', 'www.liepin.com', 'www.zhaopin.com', 'www.nowcoder.com']);
 let window: BrowserWindow;
 let browser: WebContentsView;
+let browserZoom = 1;
 let socket: WebSocket | undefined;
 let quitting = false;
 let reconnect: ReturnType<typeof setTimeout> | undefined;
 let heartbeat: ReturnType<typeof setInterval> | undefined;
 // 按请求编号保存等待中的操作，用于匹配响应、计算往返延迟和处理超时。
 const pending = new Map<string, { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>; start: number; type: string; quiet: boolean }>();
-const state: Snapshot = { connected: false, agent: { status: 'paused', mode: 'manual', revision: 0, page: { url: '', title: '' } }, browser: { url: home, title: '本地模拟招聘站', loading: true, canBack: false, canForward: false }, logs: [], latency: null };
+const state: Snapshot = { connected: false, agent: { status: 'paused', mode: 'manual', revision: 0, page: { url: '', title: '' } }, browser: { zoom: 1, url: home, title: '本地模拟招聘站', loading: true, canBack: false, canForward: false }, logs: [], latency: null };
 
 function publish() {
   // 将状态快照推送给工作台，不向招聘网页暴露内部状态。
@@ -46,7 +47,7 @@ function readPage() {
   // 从真实浏览视图读取地址、标题及历史导航状态，更新工作台显示。
   if (!browser || browser.webContents.isDestroyed()) return;
   const wc = browser.webContents;
-  state.browser = { home, url: wc.getURL() || home, title: wc.getTitle() || '正在打开页面', loading: wc.isLoading(), canBack: wc.navigationHistory.canGoBack(), canForward: wc.navigationHistory.canGoForward() };
+  state.browser = { home, zoom: browserZoom, url: wc.getURL() || home, title: wc.getTitle() || '正在打开页面', loading: wc.isLoading(), canBack: wc.navigationHistory.canGoBack(), canForward: wc.navigationHistory.canGoForward() };
   publish();
 }
 function request(type: string, quiet = false): Promise<void> {
@@ -113,6 +114,14 @@ function connect() {
     }
   };
 }
+// 缩放仅作用于内嵌网页，按 10% 调整，并限制在 50%～200%。
+function changeBrowserZoom(action: unknown) {
+  if (!['in', 'out', 'reset'].includes(String(action))) throw new Error('Unknown zoom action');
+  browserZoom = action === 'reset' ? 1 : Math.max(0.5, Math.min(2, Math.round((browserZoom + (action === 'in' ? 0.1 : -0.1)) * 10) / 10));
+  browser.webContents.setZoomFactor(browserZoom);
+  readPage();
+}
+
 function registerIPC() {
   // 仅接受工作台主框架发出的 IPC，防止网页或子框架调用本机能力。
   const handle = (channel: string, handler: (...args: any[]) => unknown) => {
@@ -122,6 +131,7 @@ function registerIPC() {
     });
   };
   handle('desktop:snapshot', () => state);
+  handle('browser:zoom', changeBrowserZoom);
   handle('browser:navigate', async (url: unknown) => {
     if (typeof url !== 'string' || !allowed(url)) throw new Error('仅允许本地模拟站及列表中的招聘网站（HTTPS）');
     await browser.webContents.loadURL(url);
@@ -191,6 +201,14 @@ app.whenReady().then(async () => {
   isolatedSession.setPermissionCheckHandler(() => false);
   isolatedSession.on('will-download', (event) => { event.preventDefault(); log('Phase 1 暂不支持文件下载', 'warning'); });
   browser = new WebContentsView({ webPreferences: { session: isolatedSession, contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  // 手动模式统一处理按钮与 Ctrl+滚轮，避免原生缩放和界面比例不一致。
+  browser.webContents.setZoomMode('manual');
+  browser.webContents.on('zoom-changed', (_event, direction) => changeBrowserZoom(direction));
+  browser.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || !(input.control || input.meta) || input.alt) return;
+    const action = ['+', '='].includes(input.key) ? 'in' : input.key === '-' ? 'out' : input.key === '0' ? 'reset' : null;
+    if (action) { event.preventDefault(); changeBrowserZoom(action); }
+  });
   browser.setBackgroundColor('#ffffff');
   window.contentView.addChildView(browser);
   browser.setBounds({ x: 232, y: 220, width: 700, height: 500 });
@@ -204,6 +222,7 @@ app.whenReady().then(async () => {
   });
   browser.webContents.on('page-title-updated', readPage);
   browser.webContents.on('did-finish-load', () => {
+    browser.webContents.setZoomFactor(browserZoom);
     readPage();
     log(`页面已就绪 · ${state.browser.title}`);
     if (state.connected) void request('page').catch((error: Error) => log(error.message, 'warning'));
