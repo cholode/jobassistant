@@ -12,7 +12,7 @@ def client():
 
 
 def test_health_and_http_auth(client):
-    assert client.get("/health").json()["phase"] == 2
+    assert client.get("/health").json()["phase"] == 4
     assert client.get("/agent/state").status_code == 401
     assert (
         client.get("/agent/state", headers={"X-Job-Agent-Token": "test-secret"}).json()[
