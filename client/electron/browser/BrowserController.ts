@@ -8,7 +8,10 @@ export interface BrowserController {
   reload(): Promise<void>;
   getText(selector: string): Promise<string>;
   getTexts(selector: string): Promise<string[]>;
-  click(selector: string): Promise<void>;
+  click(
+    selector: string,
+    expectedInput?: { selector: string; value: string },
+  ): Promise<void>;
   fill(selector: string, text: string): Promise<void>;
   waitFor(selector: string, timeout?: number): Promise<boolean>;
   // 仅供应用内受信任的适配器使用，禁止将此方法直接暴露给 RPC 或网页。
@@ -19,5 +22,10 @@ export interface BrowserController {
 }
 
 export class BrowserError extends Error {
-  constructor(public readonly code: string, message: string) { super(message); }
+  constructor(
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
 }

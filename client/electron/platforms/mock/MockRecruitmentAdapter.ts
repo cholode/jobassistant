@@ -6,9 +6,12 @@ import { selectors } from './selectors.js';
 
 export class MockRecruitmentAdapter implements PlatformAdapter {
   constructor(private readonly origin: string) {}
-  matches(url: URL) { return url.origin === this.origin && url.pathname.startsWith('/mock/'); }
+  matches(url: URL) {
+    return url.origin === this.origin && url.pathname.startsWith('/mock/');
+  }
   async read(browser: BrowserController): Promise<PageReading> {
-    if (!(await browser.waitFor(selectors.content, 1500))) throw new BrowserError('NOT_READY', '模拟站尚未加载');
+    if (!(await browser.waitFor(selectors.content, 1500)))
+      throw new BrowserError('NOT_READY', '模拟站尚未加载');
     // 一次 DOM 读取生成快照，避免多个字段分别读取时混入不同页面的数据。
     return browser.evaluate<PageReading>(`(() => {
       const s = ${JSON.stringify(selectors)};
@@ -22,7 +25,7 @@ export class MockRecruitmentAdapter implements PlatformAdapter {
         const el = document.querySelector(s.detail);
         if (!el) throw new Error('Job detail not ready');
         data.jobs = [job(el, location.hash.split('/')[1], location.href, true)];
-      } else if (location.hash === '#chat') {
+      } else if (location.hash === '#chat' || location.hash.startsWith('#chat/')) {
         data.kind = 'chat';
         data.messages = Array.from(document.querySelectorAll(s.messages)).slice(-100).map(el => ({ sender: el.classList.contains(s.ownMessage) ? 'me' : 'hr', text: el.innerText.slice(0, 4000) }));
       } else {
