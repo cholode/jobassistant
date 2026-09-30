@@ -13,7 +13,10 @@ export function useBrowserBounds() {
     observer.observe(node);
     window.addEventListener('resize', update);
     update();
-    return () => { observer.disconnect(); window.removeEventListener('resize', update); };
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+    };
   }, []);
   return slot;
 }

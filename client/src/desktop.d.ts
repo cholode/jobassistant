@@ -1,2 +1,6 @@
 import type { DesktopAPI } from '../shared/protocol';
-declare global { interface Window { desktop: DesktopAPI } }
+declare global {
+  interface Window {
+    desktop: DesktopAPI;
+  }
+}

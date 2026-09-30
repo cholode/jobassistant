@@ -5,9 +5,16 @@ export function useDesktop() {
   const { snapshot, set } = useDesktopStore();
   useEffect(() => {
     let live = true;
-    const unsubscribe = window.desktop.subscribe(state => { if (live) set(state); });
-    void window.desktop.snapshot().then(state => { if (live) set(state); });
-    return () => { live = false; unsubscribe(); };
+    const unsubscribe = window.desktop.subscribe((state) => {
+      if (live) set(state);
+    });
+    void window.desktop.snapshot().then((state) => {
+      if (live) set(state);
+    });
+    return () => {
+      live = false;
+      unsubscribe();
+    };
   }, [set]);
   return snapshot;
 }
