@@ -2,7 +2,7 @@
 
 Windows 本地求职工作台，使用 Electron 内嵌招聘网页、React 显示侧边面板、Python FastAPI 管理状态和浏览器读取请求。
 
-目前完成 Phase 1、Phase 2：手动浏览、网页缩放、暂停／恢复、BrowserController、Browser RPC 和平台适配层。当前为 Manual 模式，不会自动投递、联系 HR 或发送消息，也不调用大模型。
+目前完成 Phase 1–4 的模拟站闭环：手动浏览、网页缩放、浏览器 RPC、岗位筛选与分析、LangGraph 人工确认投递、SQLite 持久化。默认 Manual；切换 Copilot 并恢复后，仍需逐次确认才会沟通。真实 BOSS 投递适配器尚未启用。
 
 ## 环境与安装
 
@@ -36,11 +36,15 @@ powershell -ExecutionPolicy Bypass -File scripts/dev.ps1 -Built
 3. 右侧点击“读取当前页面”，查看已加载的职位信息、聊天消息或正文。Agent 暂停时也可手动读取。
 4. 跳转、刷新和断线后，旧读取结果会清空；失败时可重试。
 
-模拟站的消息只保存在网页内存中，刷新即清空，不会发送给真实公司。
+5. 打开“个人资料”，填写技能、简历事实和求职规则并保存。默认规则模式无需模型 Key。
+6. 在“岗位”面板分析列表，打开 Go 实习岗位详情并重新分析，查看匹配点和待补充项。
+7. 生成确认卡，检查或编辑招呼语，切换 Copilot、恢复 Agent，再确认沟通。应用先点击沟通，再补发针对岗位的消息，最后停在等待回复。
+
+模拟站消息保存在网页 localStorage，不会发送给真实公司。当前没有简历附件发送功能。
 
 真实招聘站当前仅支持通用可见正文读取。专用职位字段和 HR 消息适配尚未验证，暂不提供结构化解析；不会猜测真实网站选择器。读取不涵盖尚未加载、跨域 iframe 或图片中的内容。遇到识别出的验证提示会暂停，由用户手动完成验证。
 
-当前没有岗位匹配分、AI 建议、自动投递和持久化任务，这些属于后续阶段。
+Phase 3–4 的实现、配置与边界见 [岗位分析与投递工作流](docs/phase3-4.md)。
 
 ## 目录与职责
 
@@ -57,6 +61,7 @@ client/
     components/browser/       浏览区域、地址栏与缩放控件
     components/agent/         Agent 面板、页面读取结果
     components/layout/        侧边导航
+    components/jobs/          资料表单、岗位分析、投递确认卡
     hooks/                    状态订阅、读取流程、原生视图尺寸同步
     stores/                   Zustand 状态存储
   tests/                      桌面集成和 RPC 边界测试
@@ -65,10 +70,16 @@ backend/
     main.py                   应用工厂及薄接口入口
     models.py                 Agent 指令和页面状态模型
     browser/                  RPC 协议、请求关联、超时与断线处理
+    api/                      招聘 HTTP 接口
+    jobs/                     岗位模型、字段解析、硬规则
+    agents/                   规则与模型分析、基于事实的招呼语
+    graphs/                   发现与投递 LangGraph 工作流
+    database/                 SQLite 资料、岗位、投递及事件存储
     services/
       agent.py                Agent 状态与指令处理
       websocket.py            连接认证、消息分流及收发
       browser.py              页面读取服务、HTTP 认证及错误映射
+      recruitment.py          确认绑定、执行校验、限额与状态恢复
   desktop_entry.py            发布版后端入口
   tests/                      HTTP、WebSocket、RPC 与状态隔离测试
 mock-site/                    本地模拟招聘站
@@ -89,13 +100,13 @@ Python 只发送语义命令，不持有 WebContents，不发送 CSS 选择器�
 
 ## 测试
 
-先关闭使用开发端口的应用，然后执行：
+执行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/test.ps1
 ```
 
-包含 Python lint / pytest、TypeScript 检查、前端构建、RPC 边界测试、真实 Electron + 模拟站集成测试。桌面测试使用独立用户目录，不使用个人招聘网站登录会话，截图和测试数据保存在忽略提交的 `logs/` 下。
+包含 Python lint / pytest、TypeScript 检查、前端构建、RPC 边界测试、真实 Electron + 模拟站集成测试。桌面测试使用随机本地端口、独立用户目录和数据库，不使用个人招聘网站登录会话，截图和测试数据保存在忽略提交的 `logs/` 下。
 
 ## 后端单独运行
 
@@ -111,9 +122,11 @@ uv run uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8765
 
 ## 配置与数据
 
-Phase 2 无需模型 API Key，也无需 MCP 服务。后续模型配置尚未接入，当前填写 Key 不会启用 AI。
+默认规则模式无需模型 API Key，也无需 MCP 服务。可复制 `backend/.env.example` 为 `backend/.env`，配置 `OPENAI_API_KEY`、`JOB_AGENT_MODEL` 及可选的 `OPENAI_BASE_URL`，重启后在个人资料选择模型分析。模型模式会把岗位和填写的个人材料发送给配置的模型服务；当前自动化测试未调用真实模型。
 
-外部网页使用独立、持久化的沙箱会话；没有 Node.js、Python 或工作台 IPC 权限。读取结果仅在内存中显示，日志不写入正文或令牌。RPC 仅开放读取；底层点击、填写、自动导航接口在 Manual 模式被拒绝。
+外部网页使用独立、持久化的沙箱会话；没有 Node.js、Python 或工作台 IPC 权限。写入仅开放经过确认的语义操作，底层点击、填写接口不直接暴露给模型或 HTTP。Manual／暂停会阻止自动写入。
+
+开发数据保存在 `private/recruitment.db` 与 `private/workflow.db`；打包后保存在 Electron 用户数据目录的 `data/`。可通过 `JOB_AGENT_DATA_DIR` 覆盖。首次初始化可读取同目录 `profile.json`，之后通过界面修改资料。投递正文和简历事实属于本地持久化数据。
 
 `.env`、依赖、日志、浏览器登录数据和构建产物不提交到 Git。个人简历请放在已忽略的 `resumes/` 或 `private/` 中。
 
