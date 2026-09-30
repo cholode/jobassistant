@@ -49,6 +49,12 @@ class BrowserRPCClient:
             future.set_result(result)
 
     async def request(self, request: BrowserReadRequest) -> PageReading:
+        return await self.execute(
+            request.command, {"expected_url": request.expected_url}
+        )
+
+    async def execute(self, command: str, payload: dict) -> PageReading:
+        # 写入调用仅由已审批的 ApplicationGraph 发起，不直接作为 HTTP 透传接口。
         if self.socket is None:
             raise BrowserRPCError("DISCONNECTED", "桌面浏览器未连接")
         if len(self.pending) >= 16:
@@ -63,8 +69,8 @@ class BrowserRPCClient:
                     {
                         "type": "browser_command",
                         "request_id": request_id,
-                        "command": request.command,
-                        "payload": {"expected_url": request.expected_url},
+                        "command": command,
+                        "payload": payload,
                     }
                 )
                 result = await future

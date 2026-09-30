@@ -40,6 +40,7 @@ class PageReading(BaseModel):
     jobs: list[JobSummary] = Field(default_factory=list, max_length=100)
     messages: list[ChatMessage] = Field(default_factory=list, max_length=100)
     notice: str = Field(default="", max_length=1000)
+    operation: dict | None = None
 
 
 class BrowserErrorData(BaseModel):
