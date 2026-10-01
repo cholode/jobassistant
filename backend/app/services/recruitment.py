@@ -11,7 +11,9 @@ from fastapi import HTTPException
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
 
-from ..agents.job_agent import JobAgent, greeting
+from ..agents.greeting import greeting
+from ..agents.job_agent import JobAgent
+from ..agents.memory import SQLiteMemory
 from ..browser.protocol import BrowserReadRequest
 from ..database.repository import Repository, now
 from ..graphs.application import build_application
@@ -32,7 +34,8 @@ class RecruitmentService:
         )
         self.repository = Repository(self.directory)
         self.lock = asyncio.Lock()
-        self.discovery = build_discovery(rpc, self.repository, JobAgent())
+        self.job_agent = JobAgent(SQLiteMemory(self.directory / "agent-memory.db"))
+        self.discovery = build_discovery(rpc, self.repository, self.job_agent)
         self.connection = None
         self.graph = None
 
@@ -121,7 +124,7 @@ class RecruitmentService:
             }:
                 return existing
             # 使用最新材料重新评估，防止修改简历后沿用旧证据索引。
-            decision = await JobAgent().evaluate(job, config)
+            decision = await self.job_agent.evaluate(job, config)
             self.repository.save_job(job, decision)
             if decision.decision == "skip":
                 raise HTTPException(400, "岗位分析建议跳过，不能发起投递")
