@@ -46,6 +46,8 @@ powershell -ExecutionPolicy Bypass -File scripts/dev.ps1 -Built
 
 Phase 3–4 的实现、配置与边界见 [岗位分析与投递工作流](docs/phase3-4.md)。
 
+Agent 内核采用 Plan-and-Execute + Reflection，集中管理上下文、执行记忆和工具注册；无需 RAG 或嵌入模型。详见 [Agent 架构说明](docs/agent-architecture.md)。
+
 ## 目录与职责
 
 ```text
