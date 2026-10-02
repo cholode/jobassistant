@@ -50,6 +50,8 @@ Agent 内核采用 Plan-and-Execute + Reflection，集中管理上下文、执�
 
 ## 目录与职责
 
+各源码目录的接口、输入输出和调用约定见 [目录接口文档索引](docs/README.md)。每个受版本管理的业务目录均提供就近的 `README.md`；依赖、缓存、个人数据和构建产物不在文档覆盖范围。
+
 ```text
 client/
   electron/
