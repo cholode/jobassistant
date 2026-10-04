@@ -34,7 +34,7 @@ export async function checkController(desktop, moduleUrl) {
     };
   }, moduleUrl);
   expect(result.title).toBe('Python 后端开发工程师');
-  expect(result.titles).toHaveLength(4);
+  expect(result.titles).toHaveLength(5);
   expect(result.present).toBe(true);
   expect(result.absent).toBe(false);
   expect(result.screenshot).toBe(true);

@@ -15,7 +15,7 @@ export interface PageState {
 // revision 是状态修订号，page 是后端最近接收的页面地址与标题。
 export interface AgentState {
   status: 'paused' | 'running';
-  mode: 'manual' | 'copilot';
+  mode: 'manual' | 'copilot' | 'auto';
   revision: number;
   page: { url: string; title: string };
 }
@@ -44,5 +44,7 @@ export interface DesktopAPI {
   browserAction(action: 'back' | 'forward' | 'reload' | 'home'): Promise<void>;
   // 使用工作台视口中的 CSS 像素坐标定位原生网页视图。
   bounds(bounds: { x: number; y: number; width: number; height: number }): Promise<void>;
-  agentAction(action: 'pause' | 'resume' | 'ping' | 'copilot' | 'manual'): Promise<void>;
+  agentAction(
+    action: 'pause' | 'resume' | 'ping' | 'copilot' | 'manual' | 'auto',
+  ): Promise<void>;
 }

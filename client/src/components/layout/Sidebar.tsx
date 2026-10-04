@@ -17,7 +17,7 @@ interface Props {
   logCount: number;
   setTip: (tip: string) => void;
 }
-export function Sidebar({ tab, setTab, logCount, setTip }: Props) {
+export function Sidebar({ tab, setTab, logCount }: Props) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -46,19 +46,19 @@ export function Sidebar({ tab, setTab, logCount, setTip }: Props) {
           <span className="nav-dot" />
         </button>
         {[
-          { icon: MessageSquare, text: '沟通消息', phase: 'Phase 5' },
-          { icon: SquareCheckBig, text: '待确认事项', phase: 'Phase 5' },
-        ].map(({ icon: Icon, text, phase }) => (
+          { icon: MessageSquare, text: '沟通消息', tab: 'chats' },
+          { icon: SquareCheckBig, text: '投递历史与核对', tab: 'history' },
+          { icon: BriefcaseBusiness, text: '自动任务看板', tab: 'dashboard' },
+          { icon: History, text: 'Agent 执行追踪', tab: 'traces' },
+          { icon: Settings2, text: '模型设置', tab: 'model' },
+        ].map(({ icon: Icon, text, tab: target }) => (
           <button
-            key={text}
-            className="nav-item upcoming"
-            onClick={() =>
-              setTip(`${text}将在 ${phase} 实现，当前可体验网页浏览与连接控制。`)
-            }
+            key={target}
+            className={`nav-item ${tab === target ? 'selected' : ''}`}
+            onClick={() => setTab(target as PanelTab)}
           >
             <Icon size={18} />
             {text}
-            <span className="soon">待开发</span>
           </button>
         ))}
         <button
@@ -79,9 +79,9 @@ export function Sidebar({ tab, setTab, logCount, setTip }: Props) {
       <div className="sidebar-bottom">
         <div className="phase-card">
           <div>
-            <span className="tiny-dot" /> PHASE 04 <span>已就绪</span>
+            <span className="tiny-dot" /> PHASE 06 <span>已就绪</span>
           </div>
-          <strong>先分析，再确认沟通。</strong>
+          <strong>有记录，可暂停，可核对。</strong>
           <p>
             浏览网页，连接后端，
             <br />
@@ -90,7 +90,7 @@ export function Sidebar({ tab, setTab, logCount, setTip }: Props) {
           <div className="phase-progress">
             <i />
           </div>
-          <small>岗位匹配与审批投递</small>
+          <small>自动任务与执行追踪</small>
         </div>
         <button
           className="nav-item"

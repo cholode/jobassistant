@@ -61,4 +61,17 @@ export interface RecruitmentState {
   events: { kind: string; subject: string; time: string }[];
   model_configured: boolean;
 }
-export type RecruitmentAction = 'state' | 'config' | 'discover' | 'prepare' | 'approve';
+export type RecruitmentAction =
+  | 'state'
+  | 'config'
+  | 'discover'
+  | 'prepare'
+  | 'approve'
+  | 'console'
+  | 'modelSave'
+  | 'modelTest'
+  | 'autoStart'
+  | 'autoStop'
+  | 'autoReview'
+  | 'captureChat'
+  | 'resolve';

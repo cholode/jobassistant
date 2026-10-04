@@ -17,6 +17,14 @@ export function registerRecruitmentIPC(
       config: { path: '/config', method: 'PUT' },
       discover: { path: '/discover', method: 'POST' },
       prepare: { path: '/prepare', method: 'POST' },
+      console: { path: '/console/state', method: 'GET' },
+      modelSave: { path: '/console/model', method: 'PUT' },
+      modelTest: { path: '/console/model/test', method: 'POST' },
+      autoStart: { path: '/console/auto/start', method: 'POST' },
+      autoStop: { path: '/console/auto/stop', method: 'POST' },
+      autoReview: { path: '/console/auto/review', method: 'POST' },
+      captureChat: { path: '/console/chat/capture', method: 'POST' },
+      resolve: { path: '/console/resolve', method: 'POST' },
     };
 
     let route = routes[String(action)];
@@ -39,15 +47,18 @@ export function registerRecruitmentIPC(
 
     if (!route) throw new Error('不支持的招聘操作');
 
-    const response = await fetch(`${backend}/recruitment${route.path}`, {
-      method: route.method,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Job-Agent-Token': token,
+    const response = await fetch(
+      `${backend}${route.path.startsWith('/console/') ? '' : '/recruitment'}${route.path}`,
+      {
+        method: route.method,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Job-Agent-Token': token,
+        },
+        body: route.method === 'GET' ? undefined : JSON.stringify(body ?? {}),
+        signal: AbortSignal.timeout(120000),
       },
-      body: route.method === 'GET' ? undefined : JSON.stringify(body ?? {}),
-      signal: AbortSignal.timeout(120000),
-    });
+    );
 
     // 后端校验失败时提取可读错误，由界面统一显示。
     const data = await response.json();

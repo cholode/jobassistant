@@ -8,6 +8,7 @@ import { readPageFromPanel } from './page-reading.mjs';
 import { freePort } from './fixtures.mjs';
 import { checkController } from './browser-controller.mjs';
 import { checkRecruitment } from './recruitment.mjs';
+import { checkPhase6 } from './phase6.mjs';
 import { checkBossAdapter } from './boss-adapter.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -255,6 +256,13 @@ try {
   await expect(web.getByText('好工作，')).toBeVisible();
   await readPageFromPanel(ui, '职位列表');
   await checkRecruitment(ui, web);
+  // 缩短本地演示验收的等待，真实个人配置不受影响。
+  await ui.evaluate(async () => {
+    const state = await window.desktop.recruitment('state');
+    state.config.preferences.interval_seconds = 0;
+    await window.desktop.recruitment('config', state.config);
+  });
+  await checkPhase6(ui, web);
   await checkBossAdapter(
     desktop,
     ui,
@@ -268,7 +276,7 @@ try {
     return image.toPNG().toString('base64');
   });
   await writeFile(
-    path.join(root, 'logs/phase4-preview.png'),
+    path.join(root, 'logs/phase6-preview.png'),
     Buffer.from(screenshot, 'base64'),
   );
   await web.screenshot({ path: path.join(root, 'logs/mock-preview.png') });

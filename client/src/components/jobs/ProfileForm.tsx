@@ -215,11 +215,11 @@ export function ProfileForm({
         />
       </label>
       <label>
-        每日最多沟通数
+        每日最多沟通数（0 表示不限）
         <input
           type="number"
-          min={1}
-          max={20}
+          min={0}
+          max={10000}
           value={value.preferences.daily_limit}
           onChange={(e) =>
             setValue({

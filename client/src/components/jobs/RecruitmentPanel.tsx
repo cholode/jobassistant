@@ -45,7 +45,7 @@ export function RecruitmentPanel({
         <>
           <h3>求职资料与规则</h3>
           <p className="reader-hint">
-            仅保存在本机。模型密钥通过本地 .env 配置，当前
+            资料保存在本机。模型密钥可在“模型设置”中配置，当前
             {state.model_configured ? '已配置' : '未配置'}。
           </p>
           <ProfileForm
@@ -64,7 +64,7 @@ export function RecruitmentPanel({
             {busy ? '处理中…' : '分析当前页面职位'}
           </button>
           <p className="reader-hint">
-            先初筛，再打开详情重新分析。规则评分仅供参考。真实平台自动沟通尚未开放。
+            打开完整详情后分析。BOSS 沟通会核对公司、岗位和发送回执，无法核实则停止。
           </p>
           {!state.config.profile.facts.length && (
             <p className="reader-error">请先在“求职资料”填写简历事实。</p>
@@ -95,7 +95,7 @@ export function RecruitmentPanel({
                 ))}
               </details>
               <details>
-                <summary>缺口与待核实项</summary>
+                <summary>缺口与待核实项（仅自己可见，不发送给 HR）</summary>
                 {item.analysis.concerns.map((x, i) => (
                   <p key={i}>• {x}</p>
                 ))}

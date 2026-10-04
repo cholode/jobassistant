@@ -69,6 +69,19 @@ const jobs = [
       "了解 SSE 和模型调用计费者优先。",
     ],
   },
+  {
+    id: "5",
+    title: "Golang 后端实习生",
+    salary: "200–300元/天",
+    city: "上海",
+    exp: "经验不限",
+    company: "星桥演示科技",
+    icon: "星",
+    stage: "仅用于本地测试",
+    tags: ["Go", "MySQL", "Redis", "gRPC"],
+    intro: "维护 Go 服务及消息接口，每周5天，至少6个月。",
+    tasks: ["开发 Go API 和 MySQL 查询。", "使用 Redis 缓存与 gRPC 服务通信。"],
+  },
 ];
 let city = "全部";
 let query = "";

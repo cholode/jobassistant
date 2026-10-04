@@ -992,6 +992,7 @@ button:hover:not(:disabled) {
   color: #74836b;
 }
 
+.recruitment-panel > label,
 .profile-form label,
 .approval-card label {
   display: block;
@@ -999,6 +1000,8 @@ button:hover:not(:disabled) {
   color: #52634e;
   margin: 12px 0;
 }
+.recruitment-panel input:not([type='checkbox']),
+.recruitment-panel textarea,
 .profile-form input,
 .profile-form textarea,
 .profile-form select,
@@ -1035,4 +1038,18 @@ button:hover:not(:disabled) {
   padding: 6px;
   background: #fff;
   color: #52634e;
+}
+
+.queue-choice {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+}
+.queue-choice input {
+  width: auto;
+}
+.application-review .read-text {
+  max-height: 160px;
+  overflow-y: auto;
 }

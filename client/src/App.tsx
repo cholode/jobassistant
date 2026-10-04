@@ -41,12 +41,15 @@ export default function App() {
               disabled={!connected || busy}
               onChange={(event) =>
                 void run(() =>
-                  window.desktop.agentAction(event.target.value as 'manual' | 'copilot'),
+                  window.desktop.agentAction(
+                    event.target.value as 'manual' | 'copilot' | 'auto',
+                  ),
                 )
               }
             >
               <option value="manual">Manual</option>
               <option value="copilot">Copilot</option>
+              <option value="auto">Auto</option>
             </select>
             <button
               className={`control-button ${running ? 'pause' : 'resume'}`}
@@ -107,7 +110,10 @@ export default function App() {
             {running ? '工作流运行中' : '手动接管中'}
           </span>
           <span>
-            <span className="keyboard">MANUAL</span> 网页可自由操作
+            <span className="keyboard">
+              {(data?.agent.mode || 'manual').toUpperCase()}
+            </span>{' '}
+            可随时暂停接管
             <span className="status-separator">·</span>v0.0.1
           </span>
         </footer>

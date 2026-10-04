@@ -308,10 +308,12 @@ function registerIPC() {
   );
 
   handle('agent:action', async (action: unknown) => {
-    if (!['pause', 'resume', 'ping', 'manual', 'copilot'].includes(String(action))) {
+    if (
+      !['pause', 'resume', 'ping', 'manual', 'copilot', 'auto'].includes(String(action))
+    ) {
       throw new Error('Unknown agent action');
     }
-    if (['pause', 'manual', 'copilot'].includes(String(action))) {
+    if (['pause', 'manual', 'copilot', 'auto'].includes(String(action))) {
       state.agent.status = 'paused';
       publish();
     }
@@ -426,7 +428,7 @@ app
     const canWrite = () =>
       state.connected &&
       state.agent.status === 'running' &&
-      state.agent.mode === 'copilot';
+      ['copilot', 'auto'].includes(state.agent.mode);
     const controller = new ElectronBrowserController(
       browser.webContents,
       allowed,

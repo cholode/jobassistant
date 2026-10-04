@@ -14,8 +14,18 @@ import {
 } from 'lucide-react';
 import type { Snapshot } from '../../../shared/protocol';
 import { RecruitmentPanel } from '../jobs/RecruitmentPanel';
+import { ConsolePanel } from '../jobs/ConsolePanel';
 import { PageReader } from './PageReader';
-export type PanelTab = 'overview' | 'activity' | 'jobs' | 'settings';
+export type PanelTab =
+  | 'overview'
+  | 'activity'
+  | 'jobs'
+  | 'settings'
+  | 'dashboard'
+  | 'history'
+  | 'chats'
+  | 'traces'
+  | 'model';
 interface Props {
   data: Snapshot | null;
   tab: PanelTab;
@@ -55,7 +65,13 @@ export function AgentPanel({ data, tab, setTab, busy, run }: Props) {
         </button>
       </div>
       <div className="panel-body">
-        {tab === 'jobs' || tab === 'settings' ? (
+        {['dashboard', 'history', 'chats', 'traces', 'model'].includes(tab) ? (
+          <ConsolePanel
+            key={tab}
+            view={tab as 'dashboard' | 'history' | 'chats' | 'traces' | 'model'}
+            connected={connected}
+          />
+        ) : tab === 'jobs' || tab === 'settings' ? (
           <RecruitmentPanel
             connected={connected}
             agent={data?.agent}
@@ -73,10 +89,12 @@ export function AgentPanel({ data, tab, setTab, busy, run }: Props) {
               <p>
                 {running ? '连接与页面状态同步中。' : '放心浏览，网页现在由你接管。'}
                 <br />
-                Copilot 仅执行逐条确认的沟通，不发送附件。
+                {data?.agent.mode === 'auto'
+                  ? 'Auto 仅执行本次所选队列，不发送附件。'
+                  : 'Copilot 逐条确认沟通，不发送附件。'}
               </p>
               <span className="manual-pill">
-                <span /> {data?.agent.mode === 'copilot' ? 'COPILOT MODE' : 'MANUAL MODE'}
+                <span /> {(data?.agent.mode || 'manual').toUpperCase()} MODE
               </span>
             </div>
             <div className="section-caption">
