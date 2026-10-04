@@ -434,8 +434,9 @@ app
     );
     browserRPC = new BrowserRPCBridge(controller, backend, token!, canWrite);
 
-    // 手动模式统一处理按钮与 Ctrl+滚轮，避免原生缩放和界面比例不一致。
-    browser.webContents.setZoomMode('manual');
+    // isolated 让 Chromium 真正缩放网页且不影响工作台；manual 只改比例数值，页面不会缩放。
+    // 按钮、快捷键与 Ctrl+滚轮仍统一按 10% 调整。
+    browser.webContents.setZoomMode('isolated');
     browser.webContents.on('zoom-changed', (_event, direction) =>
       changeBrowserZoom(direction),
     );

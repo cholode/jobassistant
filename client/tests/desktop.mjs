@@ -75,7 +75,22 @@ try {
       ),
     ).href,
   );
-  // 同时检查控件比例和真实网页缩放，防止只更新界面数字。
+  // getZoomFactor 在 manual 模式也会变化，必须验证渲染器实际像素比例和布局宽度。
+  const baseline = await web.evaluate(() => ({
+    pixelRatio: window.devicePixelRatio,
+    width: window.innerWidth,
+  }));
+  const expectRenderedZoom = async (factor) => {
+    await expect
+      .poll(() => web.evaluate(() => window.devicePixelRatio))
+      .toBeCloseTo(baseline.pixelRatio * factor, 2);
+    await expect
+      .poll(async () =>
+        Math.abs((await web.evaluate(() => window.innerWidth)) - baseline.width / factor),
+      )
+      .toBeLessThanOrEqual(2);
+    expect((await zoomFactors()).shell).toBe(1);
+  };
   const zoomFactors = () =>
     desktop.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
@@ -84,9 +99,21 @@ try {
         page: window.contentView.children[0].webContents.getZoomFactor(),
       };
     });
+  // Electron 原生键盘入口才能覆盖主进程 before-input-event；CDP 键盘会绕过它。
+  const zoomShortcut = (keyCode) =>
+    desktop.evaluate(({ BrowserWindow }, key) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      window.focus();
+      const contents = window.contentView.children[0].webContents;
+      contents.focus();
+      for (const type of ['keyDown', 'keyUp']) {
+        contents.sendInputEvent({ type, keyCode: key, modifiers: ['control'] });
+      }
+    }, keyCode);
   await ui.getByRole('button', { name: '放大网页', exact: true }).click();
   await expect(ui.getByRole('button', { name: '重置网页缩放' })).toHaveText('110%');
   expect((await zoomFactors()).page).toBeCloseTo(1.1);
+  await expectRenderedZoom(1.1);
   expect((await zoomFactors()).shell).toBe(1);
   await ui.getByRole('button', { name: '缩小网页', exact: true }).click();
   expect((await zoomFactors()).page).toBeCloseTo(1);
@@ -94,18 +121,57 @@ try {
   await ui.getByRole('button', { name: '刷新', exact: true }).click();
   await expect(web.getByText('好工作，')).toBeVisible();
   expect((await zoomFactors()).page).toBeCloseTo(0.9);
+  await expectRenderedZoom(0.9);
+  // 焦点在招聘网页时，键盘和滚轮走同一套 10% 步进及上下限。
+  await zoomShortcut('=');
+  await expect(ui.getByRole('button', { name: '重置网页缩放' })).toHaveText('100%');
+  await expectRenderedZoom(1);
+  await zoomShortcut('-');
+  await expectRenderedZoom(0.9);
+  await zoomShortcut('0');
+  await expectRenderedZoom(1);
+  // 模拟 Electron 转发的滚轮缩放请求，检查事件处理和实际渲染的一致性。
+  await desktop.evaluate(({ BrowserWindow }) => {
+    const contents = BrowserWindow.getAllWindows()[0].contentView.children[0].webContents;
+    contents.emit('zoom-changed', {}, 'in');
+  });
+  await expect(ui.getByRole('button', { name: '重置网页缩放' })).toHaveText('110%');
+  await expectRenderedZoom(1.1);
+  // 跨站导航使用本地拦截内容，不访问真实招聘站，也不改动登录状态。
+  const zoomPage = 'https://www.liepin.com/zoom-regression-test';
+  await web.route(zoomPage, (route) =>
+    route.fulfill({
+      contentType: 'text/html',
+      body: '<h1>Zoom navigation fixture</h1>',
+    }),
+  );
+  try {
+    await ui.evaluate((url) => window.desktop.navigate(url), zoomPage);
+    await expect(
+      web.getByRole('heading', { name: 'Zoom navigation fixture' }),
+    ).toBeVisible();
+    await expectRenderedZoom(1.1);
+    await ui.getByRole('button', { name: '模拟招聘站', exact: true }).click();
+    await expect(web.getByText('好工作，')).toBeVisible();
+    await expectRenderedZoom(1.1);
+  } finally {
+    await web.unroute(zoomPage);
+  }
   await ui.evaluate(async () => {
     for (let i = 0; i < 20; i++) await window.desktop.browserZoom('out');
   });
   await expect(ui.getByRole('button', { name: '缩小网页', exact: true })).toBeDisabled();
   expect((await zoomFactors()).page).toBeCloseTo(0.5);
+  await expectRenderedZoom(0.5);
   await ui.evaluate(async () => {
     for (let i = 0; i < 20; i++) await window.desktop.browserZoom('in');
   });
   await expect(ui.getByRole('button', { name: '放大网页', exact: true })).toBeDisabled();
   expect((await zoomFactors()).page).toBeCloseTo(2);
+  await expectRenderedZoom(2);
   await ui.getByRole('button', { name: '重置网页缩放' }).click();
   expect((await zoomFactors()).page).toBeCloseTo(1);
+  await expectRenderedZoom(1);
   const isolation = await web.evaluate(() => ({
     require: typeof globalThis.require,
     bridge: typeof globalThis.desktop,
