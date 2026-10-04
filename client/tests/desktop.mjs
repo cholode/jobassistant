@@ -8,6 +8,7 @@ import { readPageFromPanel } from './page-reading.mjs';
 import { freePort } from './fixtures.mjs';
 import { checkController } from './browser-controller.mjs';
 import { checkRecruitment } from './recruitment.mjs';
+import { checkBossAdapter } from './boss-adapter.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const token = randomUUID();
@@ -254,6 +255,12 @@ try {
   await expect(web.getByText('好工作，')).toBeVisible();
   await readPageFromPanel(ui, '职位列表');
   await checkRecruitment(ui, web);
+  await checkBossAdapter(
+    desktop,
+    ui,
+    web,
+    pathToFileURL(path.join(root, 'client/dist-electron/electron')).href,
+  );
   await mkdir(path.join(root, 'logs'), { recursive: true });
   const screenshot = await desktop.evaluate(async ({ BrowserWindow }) => {
     const window = BrowserWindow.getAllWindows()[0];

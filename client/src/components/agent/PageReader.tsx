@@ -57,10 +57,15 @@ export function PageReader({
         >
           <strong>{kinds[reading.kind]}</strong>
           <small>
-            {reading.platform === 'mock' ? '模拟招聘站' : '通用读取'} ·{' '}
-            {new Date(reading.read_at).toLocaleTimeString('zh-CN', { hour12: false })}
+            {reading.platform === 'mock'
+              ? '模拟招聘站'
+              : reading.platform === 'boss'
+                ? 'BOSS 直聘'
+                : '通用读取'}{' '}
+            · {new Date(reading.read_at).toLocaleTimeString('zh-CN', { hour12: false })}
           </small>
           <p className="reader-hint">{reading.notice}</p>
+          {reading.kind === 'chat' && <p>当前会话：{reading.title}</p>}
           {reading.jobs.map((job) => (
             <article
               className="read-job"
@@ -72,6 +77,9 @@ export function PageReader({
                 {job.salary} · {job.location}
               </p>
               {!!job.tags.length && <p>{job.tags.join(' / ')}</p>}
+              {reading.platform === 'boss' && (
+                <p>招聘者活跃：{job.recruiter_activity || '未读取到，自动沟通将跳过'}</p>
+              )}
               {job.description && (
                 <details>
                   <summary>职位正文</summary>

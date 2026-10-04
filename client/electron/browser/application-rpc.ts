@@ -1,10 +1,14 @@
 // 投递 RPC 入口：校验固定载荷，将适配器结果包装成关联请求的回执。
 
 import type { BrowserController } from './BrowserController.js';
+import { BossApplicationAdapter } from '../platforms/boss/BossApplicationAdapter.js';
 import {
   MockApplicationAdapter,
   type ApplicationPayload,
 } from '../platforms/mock/MockApplicationAdapter.js';
+
+// 操作绑定留在主进程适配器内，不向网页或渲染进程暴露。
+const bossAdapters = new WeakMap<BrowserController, BossApplicationAdapter>();
 
 export async function executeApplicationCommand(
   browser: BrowserController,
@@ -25,10 +29,13 @@ export async function executeApplicationCommand(
       throw new Error('无效的投递指令');
     }
 
-    const data = await new MockApplicationAdapter(browser, origin, canWrite).execute(
-      message.command,
-      payload,
-    );
+    let adapter: MockApplicationAdapter | BossApplicationAdapter;
+    if (new URL(payload.job_url).origin === 'https://www.zhipin.com') {
+      if (!bossAdapters.has(browser))
+        bossAdapters.set(browser, new BossApplicationAdapter(browser, canWrite));
+      adapter = bossAdapters.get(browser)!;
+    } else adapter = new MockApplicationAdapter(browser, origin, canWrite);
+    const data = await adapter.execute(message.command, payload);
     return {
       type: 'browser_result',
       request_id: message.request_id,

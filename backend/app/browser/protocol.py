@@ -22,6 +22,7 @@ class JobSummary(BaseModel):
     url: str = Field(max_length=4096)
     tags: list[str] = Field(default_factory=list, max_length=30)
     description: str = Field(default="", max_length=12000)
+    recruiter_activity: str = Field(default="", max_length=100)
 
 
 class ChatMessage(BaseModel):
@@ -32,7 +33,7 @@ class ChatMessage(BaseModel):
 class PageReading(BaseModel):
     url: str = Field(max_length=4096)
     title: str = Field(max_length=512)
-    platform: Literal["mock", "generic"]
+    platform: Literal["mock", "boss", "generic"]
     kind: Literal["job_list", "job_detail", "chat", "unknown", "verification"]
     text: str = Field(max_length=20000)
     truncated: bool

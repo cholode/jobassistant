@@ -16,6 +16,7 @@ class DiscoveryState(TypedDict, total=False):
 
 def build_discovery(rpc, repository, agent):
     """仅处理当前已加载的职位，不自动翻页或打开其他职位。"""
+
     async def fetch(_state):
         page = await rpc.request(BrowserReadRequest())
         return {"page": page.model_dump()}
@@ -25,7 +26,7 @@ def build_discovery(rpc, repository, agent):
         if page.kind == "verification":
             raise ValueError("请先手动完成网页验证")
         if not page.jobs:
-            raise ValueError("当前页面没有已适配的职位；请打开模拟职位列表或详情页")
+            raise ValueError("当前页面没有已适配的职位；请打开 BOSS 职位详情或模拟站")
         config = repository.config()
         records, seen = [], set()
         for summary in page.jobs[:30]:

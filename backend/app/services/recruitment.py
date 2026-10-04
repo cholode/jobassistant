@@ -198,7 +198,7 @@ class RecruitmentService:
         record = self.repository.application(key)
         job = Job.model_validate(record["job"])
         # 真实平台写入必须先有已验证的专用适配器；不把通用正文读取当成可投递。
-        if job.platform != "mock":
+        if job.platform not in {"mock", "boss"}:
             raise ValueError("该平台投递适配器尚未验证，请手动沟通")
         page = await self.rpc.request(
             BrowserReadRequest(command="GET_JOB_DETAIL", expected_url=job.url)
@@ -279,4 +279,15 @@ class RecruitmentService:
             )
         ):
             raise ValueError("未取得发送成功回执，禁止自动重发")
-        self.set_status(key, "WAITING_REPLY", sent_at=now())
+        # 保留本次发送时的会话与回执，不依赖用户以后手动点击“记录聊天”。
+        self.set_status(
+            key,
+            "WAITING_REPLY",
+            sent_at=now(),
+            receipt={
+                "url": page.url,
+                "title": page.title,
+                "read_at": page.read_at,
+                "messages": [x.model_dump() for x in page.messages],
+            },
+        )

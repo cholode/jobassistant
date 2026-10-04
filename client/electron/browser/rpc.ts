@@ -2,6 +2,7 @@ import type { BrowserCommand, BrowserResult } from '../../shared/browser.js';
 import { BrowserError, type BrowserController } from './BrowserController.js';
 import { GenericAdapter } from '../platforms/GenericAdapter.js';
 import { MockRecruitmentAdapter } from '../platforms/mock/MockRecruitmentAdapter.js';
+import { BossRecruitmentAdapter } from '../platforms/boss/BossRecruitmentAdapter.js';
 
 // RPC 白名单刻意不包含 evaluate、click、fill、navigate 等低层能力。
 export async function executeBrowserCommand(
@@ -28,7 +29,11 @@ export async function executeBrowserCommand(
       throw new BrowserError('NOT_READY', '页面正在加载，请稍后重试');
     if (message.payload.expected_url && message.payload.expected_url !== url)
       throw new BrowserError('STALE_PAGE', '页面已变化，请重新读取');
-    const adapters = [new MockRecruitmentAdapter(origin), new GenericAdapter()];
+    const adapters = [
+      new MockRecruitmentAdapter(origin),
+      new BossRecruitmentAdapter(),
+      new GenericAdapter(),
+    ];
     const adapter = adapters.find((item) => item.matches(new URL(url)))!;
     const data = await adapter.read(browser);
     if (

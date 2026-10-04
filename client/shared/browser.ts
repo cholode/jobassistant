@@ -9,6 +9,7 @@ export interface JobSummary {
   url: string;
   tags: string[];
   description: string;
+  recruiter_activity?: string;
 }
 export interface ChatMessage {
   sender: 'hr' | 'me' | 'unknown';
@@ -18,7 +19,7 @@ export interface PageReading {
   operation?: { operation_id: string; action: string };
   url: string;
   title: string;
-  platform: 'mock' | 'generic';
+  platform: 'mock' | 'boss' | 'generic';
   kind: 'job_list' | 'job_detail' | 'chat' | 'unknown' | 'verification';
   text: string;
   truncated: boolean;
