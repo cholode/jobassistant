@@ -19,8 +19,12 @@ def fingerprint(value: object) -> str:
 def parse_job(summary: JobSummary, platform: str, detail: bool) -> Job:
     """将平台摘要转为领域模型；无法解析的数值用 None 表示。"""
     text = f"{summary.title} {summary.location} {summary.description}"
+    # 部分实习职位只标注到岗天数、月数和日薪，标题并不包含“实习”。
+    internship = "实习" in text or bool(
+        re.search(r"\d+\s*天\s*/\s*周", summary.location) and "元/天" in summary.salary
+    )
     experience = None
-    if re.search(r"经验不限|无经验|在校|应届|实习", text):
+    if internship or re.search(r"经验不限|无经验|在校|应届|实习", text):
         experience = 0
     match = re.search(
         r"(\d+)\s*(?:[-–~至]\s*\d+)?\s*年(?:以上)?(?:工作)?经验|(\d+)\s*[-–~至]\s*\d+\s*年",
@@ -55,11 +59,15 @@ def parse_job(summary: JobSummary, platform: str, detail: bool) -> Job:
         location=summary.location,
         salary=summary.salary,
         description=summary.description,
+        recruiter_activity=summary.recruiter_activity,
         tags=summary.tags,
         experience_months=experience,
         salary_min_monthly=monthly,
-        employment="internship"
-        if "实习" in text
+        # 标题明确为兼职时不能因为经验不限就推断成正式工作。
+        employment="unknown"
+        if re.search(r"兼职|part[ -]?time", summary.title, re.IGNORECASE)
+        else "internship"
+        if internship
         else "full_time"
         if experience is not None
         else "unknown",

@@ -64,6 +64,10 @@ export function ProfileForm({
       <p className="reader-hint">
         填写可以向招聘方陈述的真实经历。招呼语只引用这里的事实；附件不会自动发送。
       </p>
+      <p className="reader-hint">
+        BOSS 仅沟通 7 天内活跃的招聘者；超过 7
+        天、活跃范围不明确或未读取到状态时自动跳过。
+      </p>
       <label>
         每周可实习天数
         <input

@@ -68,6 +68,7 @@ class Job(BaseModel):
     location: str
     salary: str
     description: str
+    recruiter_activity: str = ""
     tags: list[str]
     experience_months: int | None = None
     salary_min_monthly: int | None = None
