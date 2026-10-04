@@ -38,7 +38,8 @@ class Preferences(BaseModel):
     )
     blacklist: list[str] = Field(default_factory=list, max_length=100)
     minimum_monthly_salary: int = Field(default=0, ge=0)
-    daily_limit: int = Field(default=3, ge=1, le=20)
+    # 0 表示不另设本地数量上限，仍遵守平台限制和任务队列范围。
+    daily_limit: int = Field(default=3, ge=0, le=10000)
     interval_seconds: int = Field(default=30, ge=0, le=3600)
 
     @field_validator("keywords", "cities", "blacklist")

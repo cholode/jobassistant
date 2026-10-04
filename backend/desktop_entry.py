@@ -1,13 +1,13 @@
 """发布版后端入口，由 Electron 启动；开发模式直接使用 Uvicorn 工厂入口。"""
 
+import os
 import socket
 import sys
 from pathlib import Path
-import os
 
 import uvicorn
-from app.main import create_app
 
+from app.main import create_app
 
 if __name__ == "__main__":
     if getattr(sys, "frozen", False):

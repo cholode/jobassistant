@@ -94,11 +94,11 @@ class RecruitmentService:
         return record
 
     def running(self):
-        if (
-            self.agent.state["status"] != "running"
-            or self.agent.state["mode"] != "copilot"
-        ):
-            raise ValueError("执行已停止：请切换 Copilot 并恢复，再重新确认")
+        if self.agent.state["status"] != "running" or self.agent.state["mode"] not in {
+            "copilot",
+            "auto",
+        }:
+            raise ValueError("执行已停止：请切换 Copilot 或 Auto 并恢复")
 
     async def prepare(self, token, job_id):
         """生成绑定当前资料的审批卡，到图的人工中断点为止，不点击网页。"""
@@ -219,7 +219,8 @@ class RecruitmentService:
         ]
         today = now()[:10]
         if (
-            sum(x["contact_attempt_at"][:10] == today for x in attempts)
+            config.preferences.daily_limit > 0
+            and sum(x["contact_attempt_at"][:10] == today for x in attempts)
             >= config.preferences.daily_limit
         ):
             raise ValueError("已达到每日沟通上限")

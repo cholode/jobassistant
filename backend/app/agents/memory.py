@@ -68,3 +68,12 @@ class SQLiteMemory:
     def forget(self, scope: str) -> None:
         with self._connect() as db:
             db.execute("DELETE FROM memories WHERE scope = ?", (scope,))
+
+    def recent(self, limit: int = 50) -> list[dict]:
+        """返回执行追踪摘要供本地工作台查看，不返回提示词或密钥。"""
+        with self._connect() as db:
+            rows = db.execute(
+                "SELECT run_id, record FROM memories ORDER BY seq DESC LIMIT ?",
+                (max(1, min(limit, 100)),),
+            ).fetchall()
+        return [{"run_id": row[0], **json.loads(row[1])} for row in rows]

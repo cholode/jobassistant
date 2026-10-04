@@ -50,6 +50,8 @@ class FakeBrowser:
 
     async def execute(self, action, payload):
         self.actions.append(action)
+        if action == "OPEN_JOB":
+            return self.page
         if action == "CONTACT_HR":
             if self.after_contact:
                 self.after_contact()

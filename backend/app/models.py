@@ -13,6 +13,8 @@ class PageState(BaseModel):
 
 class ClientMessage(BaseModel):
     # 限制指令类型，用 request_id 将响应关联到桌面端发出的请求。
-    type: Literal["pause", "resume", "start", "page", "ping", "copilot", "manual"]
+    type: Literal[
+        "pause", "resume", "start", "page", "ping", "copilot", "manual", "auto"
+    ]
     request_id: str = Field(max_length=100)
     page: PageState | None = None

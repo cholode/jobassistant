@@ -9,11 +9,13 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Header, WebSocket
 from fastapi.staticfiles import StaticFiles
 
+from .api.console import console_router
 from .api.recruitment import recruitment_router
 from .browser.client import BrowserRPCClient
 from .browser.protocol import BrowserReadRequest, PageReading
 from .services.agent import AgentService
 from .services.browser import BrowserService
+from .services.console import ConsoleService
 from .services.recruitment import RecruitmentService
 from .services.websocket import WebSocketService
 
@@ -28,6 +30,7 @@ def create_app(token: str | None = None, data_dir: Path | None = None) -> FastAP
     websocket_service = WebSocketService(service, rpc)
     browser_service = BrowserService(service, rpc)
     recruitment = RecruitmentService(service, rpc, data_dir)
+    console = ConsoleService(recruitment)
 
     @asynccontextmanager
     async def lifespan(_app):
@@ -35,10 +38,12 @@ def create_app(token: str | None = None, data_dir: Path | None = None) -> FastAP
         try:
             yield
         finally:
+            await console.auto.close()
             await recruitment.close()
 
     app = FastAPI(title="Job Agent Desktop", version="0.0.1", lifespan=lifespan)
     app.include_router(recruitment_router(recruitment))
+    app.include_router(console_router(console))
 
     @app.get("/health")
     async def health():

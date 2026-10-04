@@ -14,6 +14,7 @@ class ApplicationState(TypedDict, total=False):
 
 def build_application(service, checkpointer):
     """构建带持久化中断点的图，具体副作用和状态校验仍由服务执行。"""
+
     def approval(state):
         record = service.repository.application(state["application_id"])
         # 重放此节点只再次获取审批，不执行点击或发送。
