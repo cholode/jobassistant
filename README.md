@@ -2,7 +2,7 @@
 
 Windows 本地求职工作台，使用 Electron 内嵌招聘网页、React 显示侧边面板、Python FastAPI 管理状态和浏览器读取请求。
 
-目前完成 Phase 1–4 的模拟站闭环：手动浏览、网页缩放、浏览器 RPC、岗位筛选与分析、LangGraph 人工确认投递、SQLite 持久化。默认 Manual；切换 Copilot 并恢复后，仍需逐次确认才会沟通。真实 BOSS 投递适配器尚未启用。
+目前具备 Phase 1–4 基础流程及 Phase 6 工作台：手动浏览、网页缩放、岗位分析、确认投递、Auto 队列、模型设置、持久历史、聊天快照、执行追踪和异常核对。默认 Manual；Copilot 逐条确认，Auto 仅执行本次选择的已分析岗位。BOSS 专用适配器遇到未核实页面会停止；Phase 5 自动回复与附件发送尚未实现。使用与边界见 [Phase 6 工作台](docs/phase6.md)。
 
 ## 环境与安装
 
