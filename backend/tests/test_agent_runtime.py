@@ -162,7 +162,7 @@ async def test_model_receives_bounded_memory_and_result_is_reflected(
         def __init__(self, **kwargs):
             pass
 
-        def with_structured_output(self, schema):
+        def with_structured_output(self, schema, **kwargs):
             assert schema is JobDecision
             return self
 

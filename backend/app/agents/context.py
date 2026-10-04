@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from ..jobs.models import Job, JobDecision, RecruitmentConfig
 from ..jobs.parser import fingerprint
+from ..jobs.review import recruitment_today
 
 
 @dataclass
@@ -34,8 +35,10 @@ class AgentContext:
     def model_input(self, max_chars: int = 32000) -> str:
         """优先保留完整当前材料，历史摘要只占剩余预算；这是字符预算而非 token 数。"""
         current = {
+            "current_date": recruitment_today().isoformat(),
             "job": self.job.model_dump(),
             "profile": self.config.profile.model_dump(),
+            "preferences": self.config.preferences.model_dump(),
         }
         text = json.dumps(current, ensure_ascii=False)
         if len(text) > max_chars:
