@@ -125,15 +125,27 @@ export class ElectronBrowserController implements BrowserController {
     this.ensureWritable();
     // 在同一段同步脚本中校验待发送文本并点击，避免用户改字后发送未确认的内容。
     await this.run(
-      `(() => { const expected = ${JSON.stringify(expectedInput ?? null)}; if (expected) { const input = document.querySelector(expected.selector); if (!input || input.value !== expected.value) throw new Error('Message changed; confirmation required'); } const el = document.querySelector(${JSON.stringify(selector)}); if (!(el instanceof HTMLElement)) throw new Error('Element not found'); el.click(); })()`,
+      `(() => { const expected = ${JSON.stringify(expectedInput ?? null)}; if (expected) { const input = document.querySelector(expected.selector); if (!input || (input.isContentEditable ? input.innerText : input.value) !== expected.value) throw new Error('Message changed; confirmation required'); } const el = document.querySelector(${JSON.stringify(selector)}); if (!(el instanceof HTMLElement)) throw new Error('Element not found'); el.click(); })()`,
       false,
     );
   }
 
   async fill(selector: string, text: string) {
     this.ensureWritable();
+    // 富文本输入框需要 Chromium 原生输入事件，直接改 innerText 无法同步站点编辑器状态。
+    const revision = this.revision;
+    const editable = await this.evaluate<boolean>(
+      `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!(el instanceof HTMLElement) || !el.isContentEditable) return false; el.focus(); const selection = getSelection(); const range = document.createRange(); range.selectNodeContents(el); selection.removeAllRanges(); selection.addRange(range); return document.activeElement === el; })()`,
+    );
+    if (editable) {
+      this.ensureWritable();
+      if (revision !== this.revision)
+        throw new BrowserError('STALE_PAGE', '输入前页面已变化');
+      await this.contents.insertText(text);
+      return;
+    }
     await this.evaluate(
-      `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) throw new Error('Input not found'); const proto = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype; Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, ${JSON.stringify(text)}); el.dispatchEvent(new Event('input', {bubbles: true})); el.dispatchEvent(new Event('change', {bubbles: true})); })()`,
+      `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (el instanceof HTMLElement && el.isContentEditable) { el.focus(); el.innerText = ${JSON.stringify(text)}; el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ${JSON.stringify(text)} })); return; } if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) throw new Error('Input not found'); const proto = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype; Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, ${JSON.stringify(text)}); el.dispatchEvent(new Event('input', {bubbles: true})); el.dispatchEvent(new Event('change', {bubbles: true})); })()`,
     );
   }
 

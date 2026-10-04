@@ -15,8 +15,10 @@ class BrowserRPCError(Exception):
 
 
 class BrowserRPCClient:
-    def __init__(self, timeout: float = 8):
+    def __init__(self, timeout: float = 8, contact_timeout: float = 25):
         self.timeout = timeout
+        # 发起沟通可能整页跳转，响应期限需覆盖桌面适配器的只读等待。
+        self.contact_timeout = contact_timeout
         self.socket: WebSocket | None = None
         self.pending: dict[str, asyncio.Future] = {}
         self.send_lock = asyncio.Lock()
@@ -64,7 +66,8 @@ class BrowserRPCClient:
         self.pending[request_id] = future
         try:
             # 超时覆盖发送及等待响应两个阶段。
-            async with asyncio.timeout(self.timeout):
+            deadline = self.contact_timeout if command == "CONTACT_HR" else self.timeout
+            async with asyncio.timeout(deadline):
                 await self.send(
                     {
                         "type": "browser_command",

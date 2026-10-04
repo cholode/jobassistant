@@ -107,6 +107,21 @@ async def test_browser_error_and_cancellation():
     assert rpc.pending == {}
 
 
+@pytest.mark.asyncio
+async def test_contact_waits_for_navigation_without_retrying_click():
+    rpc = BrowserRPCClient(timeout=0.01, contact_timeout=0.2)
+    socket = FakeSocket()
+    rpc.attach(socket)
+    request = asyncio.create_task(rpc.execute("CONTACT_HR", {}))
+    command = await socket.sent.get()
+    await asyncio.sleep(0.03)
+    assert not request.done()
+    rpc.receive(result(command["request_id"]))
+    assert (await request).title == "测试页面"
+    assert socket.sent.empty()
+    assert rpc.pending == {}
+
+
 def test_http_auth_and_readonly_command_validation():
     with TestClient(create_app("test")) as client:
         assert client.post("/browser/read", json={}).status_code == 401
