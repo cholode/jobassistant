@@ -18,6 +18,6 @@ powershell -ExecutionPolicy Bypass -File scripts/test.ps1
 powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Version 0.0.1
 ```
 
-开发需空闲 8765、5173 端口（Built 不运行 Vite）；关闭本轮桌面后脚本清理服务。打包前需安装 PyInstaller，产物写入 build 和 release/v<Version>，不会发布到外部服务。已有同版本构建可能被更新，版本归档约定见 [release](../release/README.md)。
+开发脚本先用 uv 按锁文件同步后端依赖并验证 Python，保留额外安装的打包工具；环境损坏时优先修复。开发需空闲 8765、5173 端口（Built 仅需 8765）；关闭本轮桌面后脚本清理服务。服务提前退出会显示退出码、日志路径和最近错误内容。打包前需安装 PyInstaller，产物写入 build 和 release/v<Version>，不会发布到外部服务。已有同版本构建可能被更新，版本归档约定见 [release](../release/README.md)。
 
 测试结果和截图见 logs；依赖、日志、数据库和二进制目录不属于源码接口文档覆盖范围。

@@ -13,10 +13,13 @@ class JobAgent:
         memory: MemoryStore,
         planner: Planner | None = None,
         retriever: Retriever | None = None,
+        progress=None,
     ):
         self.memory = memory
         self.tools = build_job_tools(memory, retriever)
-        self.executor = PlanExecutor(planner or JobPlanner(), self.tools)
+        self.executor = PlanExecutor(
+            planner or JobPlanner(), self.tools, progress=progress
+        )
 
     async def evaluate(self, job, config):
         # 每次调用独立创建上下文，同一个 Agent 可复用而不共享短期状态。

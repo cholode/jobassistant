@@ -66,7 +66,11 @@ class BrowserRPCClient:
         self.pending[request_id] = future
         try:
             # 超时覆盖发送及等待响应两个阶段。
-            deadline = self.contact_timeout if command == "CONTACT_HR" else self.timeout
+            deadline = (
+                self.contact_timeout
+                if command in {"CONTACT_HR", "SEARCH_JOBS"}
+                else self.timeout
+            )
             async with asyncio.timeout(deadline):
                 await self.send(
                     {

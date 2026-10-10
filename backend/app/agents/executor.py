@@ -14,12 +14,16 @@ class PlanExecutor:
         tools: ToolRegistry,
         max_steps: int = 8,
         timeout: float = 120,
+        progress=None,
     ):
         self.planner, self.tools = planner, tools
         self.max_steps, self.timeout = max_steps, timeout
+        self.progress = progress
 
     async def run(self, context: AgentContext):
         async with asyncio.timeout(self.timeout):
+            if self.progress:
+                await self.progress("planning", context.job)
             plan = await self.planner.plan(context, self.tools.schemas())
             for _ in range(self.max_steps):
                 if not plan.steps:
@@ -31,6 +35,8 @@ class PlanExecutor:
                     "status": "running",
                 }
                 context.trace.append(trace)
+                if self.progress:
+                    await self.progress(step.tool, context.job)
                 try:
                     result = await self.tools.call(step.tool, step.arguments, context)
                 except BaseException as error:

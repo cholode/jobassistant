@@ -722,6 +722,18 @@ button:hover:not(:disabled) {
   margin-left: auto;
   color: #b1bbaa;
 }
+/* 主入口与实际启动按钮使用同一醒目样式，禁用时保留可读提示。 */
+.nav-item.start-application,
+.test-button.start-application {
+  background: #245447;
+  color: #fff;
+  border-color: #245447;
+}
+.test-button.start-application:disabled {
+  background: #e3e9e5;
+  color: #63736b;
+  border-color: #e3e9e5;
+}
 .next-card {
   margin-top: 23px;
   border: 1px dashed #dce4d3;
@@ -1052,4 +1064,45 @@ button:hover:not(:disabled) {
 .application-review .read-text {
   max-height: 160px;
   overflow-y: auto;
+}
+.agent-activity-card {
+  flex-shrink: 0;
+  margin: 0 16px 8px;
+  padding: 12px;
+  border: 1px solid var(--border, #dce5df);
+  border-radius: 10px;
+  background: #f5f8f6;
+  font-size: 12px;
+}
+.agent-activity-heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #315346;
+}
+.agent-activity-card p {
+  margin: 6px 0 0;
+}
+.agent-activity-job {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-activity-detail {
+  overflow-wrap: anywhere;
+  max-height: 54px;
+  overflow-y: auto;
+}
+.agent-activity-card small {
+  display: block;
+  margin-top: 6px;
+  color: #68736e;
+}
+.agent-activity-progress {
+  color: #53665c;
+  font-variant-numeric: tabular-nums;
+}
+.agent-activity-card[data-status='error'] {
+  background: #fff6f0;
+  border-color: #e8c7b7;
 }

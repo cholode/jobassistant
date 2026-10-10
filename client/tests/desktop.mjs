@@ -10,6 +10,7 @@ import { checkController } from './browser-controller.mjs';
 import { checkRecruitment } from './recruitment.mjs';
 import { checkPhase6 } from './phase6.mjs';
 import { checkBossAdapter } from './boss-adapter.mjs';
+import { checkAutoSearch } from './auto-search.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const token = randomUUID();
@@ -269,6 +270,7 @@ try {
     web,
     pathToFileURL(path.join(root, 'client/dist-electron/electron')).href,
   );
+  await checkAutoSearch(ui, web);
   await mkdir(path.join(root, 'logs'), { recursive: true });
   const screenshot = await desktop.evaluate(async ({ BrowserWindow }) => {
     const window = BrowserWindow.getAllWindows()[0];

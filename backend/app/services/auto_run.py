@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from fastapi import HTTPException
 
+from ..agents.search import JobSearchAgent
 from ..browser.client import BrowserRPCError
 from ..browser.protocol import BrowserReadRequest
 from ..database.repository import now
@@ -39,7 +40,14 @@ class AutoRunService:
         repo._put(repo.settings, "auto_run", self.state)
 
     async def start(
-        self, token, job_ids, job_urls=None, review_each=False, target_count=20
+        self,
+        token,
+        job_ids,
+        job_urls=None,
+        review_each=False,
+        target_count=20,
+        source="selected",
+        max_search_pages=10,
     ):
         self.service.authorize(token)
         try:
@@ -51,7 +59,18 @@ class AutoRunService:
         if self.task and not self.task.done():
             raise HTTPException(409, "自动队列正在运行")
         job_urls = job_urls or []
-        if not 1 <= len(job_ids) + len(job_urls) <= 100:
+        if source not in {"selected", "search"} or not 1 <= max_search_pages <= 30:
+            raise HTTPException(400, "无效搜索任务参数")
+        config = self.service.repository.config()
+        if source == "search" and (
+            not config.preferences.keywords
+            or any(len(word) > 100 for word in config.preferences.keywords)
+            or not config.profile.facts
+        ):
+            raise HTTPException(400, "请先保存求职关键词（每条最多100字）和简历事实")
+        if source == "search" and (job_ids or job_urls):
+            raise HTTPException(400, "自主搜索不需要传入候选岗位")
+        if source == "selected" and not 1 <= len(job_ids) + len(job_urls) <= 100:
             raise HTTPException(400, "请选择或粘贴 1–100 个岗位")
         urls = []
         for raw in job_urls:
@@ -77,6 +96,13 @@ class AutoRunService:
             sent_count=0,
             reviewed_count=0,
             current_review=None,
+            source=source,
+            max_search_pages=max_search_pages,
+            search_keyword="",
+            search_page=0,
+            discovered_count=0,
+            current_index=0,
+            total=0,
             config_hash=fingerprint(self.service.repository.config().model_dump()),
         )
         self.task = asyncio.create_task(self.run(token))
@@ -147,6 +173,12 @@ class AutoRunService:
         self.update(
             status="awaiting_review", message="本岗已发送，请核对页面和介绍后填写复盘"
         )
+        await self.service.activity.report(
+            "review",
+            record["job"],
+            status="waiting",
+            sent_count=self.state["sent_count"],
+        )
         while not self.review_event.is_set():
             self.check()
             try:
@@ -180,19 +212,69 @@ class AutoRunService:
             queue = [(key, None) for key in self.state["job_ids"]] + [
                 (None, url) for url in self.state.get("job_urls", [])
             ]
-            for index, (job_id, url) in enumerate(queue):
+            await service.activity.report(
+                "opening",
+                reset=True,
+                current_index=0,
+                total=len(queue),
+                sent_count=0,
+                target_count=self.state["target_count"],
+            )
+            search = None
+            if self.state.get("source") == "search":
+
+                async def progress(keyword, number, discovered):
+                    self.update(
+                        search_keyword=keyword,
+                        search_page=number,
+                        discovered_count=discovered,
+                        message=f"正在搜索 {keyword}，第 {number} 页",
+                    )
+                    await service.activity.report(
+                        "searching",
+                        detail=self.state["message"],
+                        sent_count=self.state["sent_count"],
+                    )
+
+                search = JobSearchAgent(
+                    service.rpc,
+                    repo.config().preferences.keywords,
+                    self.state["max_search_pages"],
+                    self.check,
+                    progress,
+                )
+
+            async def candidates():
+                if search:
+                    async for candidate in search.candidates():
+                        yield candidate
+                else:
+                    for candidate in queue:
+                        yield candidate
+
+            index = -1
+            async for job_id, url in candidates():
+                index += 1
                 self.check()
+                total = search.discovered if search else len(queue)
                 self.update(
                     current_index=index + 1,
-                    total=len(queue),
-                    message=f"正在检查第 {index + 1}/{len(queue)} 个候选岗位",
+                    total=total,
+                    discovered_count=total,
+                    message=f"正在检查第 {index + 1}/{total} 个候选岗位",
+                )
+                await service.activity.report(
+                    "opening", current_index=index + 1, total=total
                 )
                 if url:
                     # 导入的是候选链接，不代表已满足条件；先读取真实页面再分析。
                     await service.rpc.execute("OPEN_JOB", {"url": url})
+                    await service.activity.report("reading")
                     page = await service.rpc.request(
-                        BrowserReadRequest(command="GET_JOB_DETAIL")
+                        BrowserReadRequest(command="GET_JOB_DETAIL", expected_url=url)
                     )
+                    if page.url != url:
+                        raise ValueError("候选岗位页面已变化，已停止")
                     if page.kind == "verification":
                         raise ValueError(page.notice or "平台需要人工验证")
                     if "已沟通过" in page.notice or "已关闭" in page.notice:
@@ -278,7 +360,7 @@ class AutoRunService:
                     break
                 # 人工复盘时间计入投递间隔，避免检查完后再完整等待一次。
                 # 最终发送前仍由 verify_application 按数据库中的尝试时间核验。
-                if index < len(queue) - 1:
+                if search or index < len(queue) - 1:
                     while True:
                         self.check()
                         elapsed = (
@@ -288,20 +370,44 @@ class AutoRunService:
                         remaining = repo.config().preferences.interval_seconds - elapsed
                         if remaining <= 0:
                             break
+                        await service.activity.report(
+                            "interval",
+                            status="waiting",
+                            detail=f"约 {int(remaining) + 1} 秒后检查下一岗",
+                            sent_count=self.state["sent_count"],
+                        )
                         await asyncio.sleep(min(1, remaining))
             reached = self.state["sent_count"] >= self.state["target_count"]
             self.update(
                 status="completed",
                 message="已达到本轮目标"
                 if reached
-                else "候选岗位已处理完，未达到目标可补充链接",
+                else (
+                    f"本轮搜索已结束：{search.summary}；可调整关键词或搜索页数后重试"
+                    if search
+                    else "候选岗位已处理完，未达到目标可补充链接"
+                ),
+            )
+            await service.activity.report(
+                "completed",
+                status="done",
+                detail=self.state["message"],
+                sent_count=self.state["sent_count"],
             )
         except asyncio.CancelledError:
             self.update(status="stopped", message="程序退出，未自动恢复队列")
+            await service.activity.report(
+                "stopped", status="done", detail=self.state["message"]
+            )
             raise
         except Exception as error:  # noqa: BLE001 — 后台任务边界必须记录失败并停止队列
             service.agent.state["status"] = "paused"
             self.update(status="stopped", message=str(error)[:300])
+            await service.activity.report(
+                "stopped",
+                status="done" if self.cancelled else "error",
+                detail=self.state["message"],
+            )
         finally:
             await self.publish()
             repo.event(

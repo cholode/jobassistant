@@ -5,6 +5,7 @@ import { useAction } from './hooks/useAction';
 import { BrowserPane } from './components/browser/BrowserPane';
 import { Sidebar } from './components/layout/Sidebar';
 import { AgentPanel, type PanelTab } from './components/agent/AgentPanel';
+import { WorkspaceSummary } from './components/layout/WorkspaceSummary';
 
 export default function App() {
   const data = useDesktop();
@@ -35,22 +36,32 @@ export default function App() {
             <strong>招聘浏览器</strong>
           </div>
           <div className="top-actions">
-            <select
+            <div
+              className="mode-switch"
+              role="group"
               aria-label="运行模式"
-              value={data?.agent.mode ?? 'manual'}
-              disabled={!connected || busy}
-              onChange={(event) =>
-                void run(() =>
-                  window.desktop.agentAction(
-                    event.target.value as 'manual' | 'copilot' | 'auto',
-                  ),
-                )
-              }
             >
-              <option value="manual">Manual</option>
-              <option value="copilot">Copilot</option>
-              <option value="auto">Auto</option>
-            </select>
+              {(['manual', 'copilot', 'auto'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  aria-label={
+                    {
+                      manual: 'Manual 手动',
+                      copilot: 'Copilot 智能协作',
+                      auto: 'Auto 自动执行',
+                    }[mode]
+                  }
+                  aria-pressed={(data?.agent.mode ?? 'manual') === mode}
+                  disabled={!connected || busy}
+                  onClick={() => void run(() => window.desktop.agentAction(mode))}
+                >
+                  {{ manual: 'Manual', copilot: 'Copilot', auto: 'Auto' }[mode]}
+                  <span>
+                    {{ manual: '手动', copilot: '智能协作', auto: '自动执行' }[mode]}
+                  </span>
+                </button>
+              ))}
+            </div>
             <button
               className={`control-button ${running ? 'pause' : 'resume'}`}
               disabled={!connected || busy}
@@ -89,6 +100,10 @@ export default function App() {
             <span className="user-circle">W</span>
           </div>
         </header>
+        <WorkspaceSummary
+          connected={connected}
+          setTab={setTab}
+        />
         <div className="work-area">
           <BrowserPane
             data={data}

@@ -78,16 +78,26 @@ export function RecruitmentPanel({
               <p>
                 {item.job.company} · {item.job.salary}
               </p>
-              <p>
-                {item.analysis.source === 'llm' ? '模型匹配' : '规则初筛'}{' '}
-                {item.analysis.match_score}/100 ·{' '}
-                {
-                  { apply: '建议沟通', skip: '跳过', review: '需复核' }[
-                    item.analysis.decision
-                  ]
-                }
-              </p>
-              <p>{item.analysis.reason}</p>
+              <div className="match-summary">
+                <div>
+                  <span>{item.analysis.source === 'llm' ? '模型匹配' : '规则初筛'}</span>
+                  <strong>
+                    {item.analysis.match_score}
+                    <small>/100</small>
+                  </strong>
+                </div>
+                <span className={`decision-chip decision-${item.analysis.decision}`}>
+                  {
+                    { apply: '建议沟通', skip: '跳过', review: '需复核' }[
+                      item.analysis.decision
+                    ]
+                  }
+                </span>
+              </div>
+              <div className="analysis-note">
+                <strong>岗位分析</strong>
+                <p>{item.analysis.reason}</p>
+              </div>
               <details open>
                 <summary>匹配依据</summary>
                 {item.analysis.strengths.map((x, i) => (

@@ -21,6 +21,7 @@ from ..graphs.discovery import build_discovery
 from ..jobs.models import Approval, Job, RecruitmentConfig
 from ..jobs.parser import fingerprint, parse_job
 from ..jobs.rules import hard_filter
+from .activity import ActivityService
 
 
 class RecruitmentService:
@@ -34,7 +35,11 @@ class RecruitmentService:
         )
         self.repository = Repository(self.directory)
         self.lock = asyncio.Lock()
-        self.job_agent = JobAgent(SQLiteMemory(self.directory / "agent-memory.db"))
+        self.activity = ActivityService(agent, rpc)
+        self.job_agent = JobAgent(
+            SQLiteMemory(self.directory / "agent-memory.db"),
+            progress=self.activity.report,
+        )
         self.discovery = build_discovery(rpc, self.repository, self.job_agent)
         self.connection = None
         self.graph = None
@@ -77,9 +82,16 @@ class RecruitmentService:
         self.authorize(token)
         async with self.lock:
             try:
+                await self.activity.report(
+                    "reading", reset=self.agent.state["mode"] != "auto"
+                )
                 result = await self.discovery.ainvoke({})
+                await self.activity.report("analyzed", status="done")
                 return result["records"]
             except Exception as error:
+                await self.activity.report(
+                    "error", status="error", detail="读取或分析失败，请查看运行记录"
+                )
                 self.repository.event(
                     "DISCOVERY_FAILED", "current", type(error).__name__
                 )
@@ -124,9 +136,23 @@ class RecruitmentService:
             }:
                 return existing
             # 使用最新材料重新评估，防止修改简历后沿用旧证据索引。
-            decision = await self.job_agent.evaluate(job, config)
+            try:
+                if self.agent.state["mode"] != "auto":
+                    await self.activity.report("planning", job, reset=True)
+                decision = await self.job_agent.evaluate(job, config)
+            except Exception:
+                await self.activity.report(
+                    "error",
+                    job,
+                    status="error",
+                    detail="岗位重新分析失败，请重试或检查模型设置",
+                )
+                raise
             self.repository.save_job(job, decision)
             if decision.decision == "skip":
+                await self.activity.report(
+                    "analyzed", job, status="done", detail="岗位不满足投递条件，已跳过"
+                )
                 raise HTTPException(400, "岗位分析建议跳过，不能发起投递")
             # 确认卡绑定岗位内容、个人材料和消息，过期审批不能用于新岗位。
             record = {
@@ -149,6 +175,7 @@ class RecruitmentService:
                 {"configurable": {"thread_id": record["operation_id"]}},
             )
             self.repository.event("APPROVAL_REQUIRED", record["id"])
+            await self.activity.report("approval", job, status="waiting")
             return record
 
     async def approve(self, token, key, approval: Approval):
@@ -181,6 +208,10 @@ class RecruitmentService:
                     Command(resume={"approved": approval.approved}),
                     {"configurable": {"thread_id": record["operation_id"]}},
                 )
+                if not approval.approved:
+                    await self.activity.report(
+                        "stopped", record["job"], status="done", detail="已取消本岗沟通"
+                    )
             except Exception as error:  # noqa: BLE001 — 图中任意失败都必须持久化，防止副作用重发
                 current = self.repository.application(key)
                 # 点击后未取得回执属于结果不确定，绝不自动重发。
@@ -190,6 +221,12 @@ class RecruitmentService:
                     else "ERROR"
                 )
                 self.set_status(key, status, error=str(error)[:1000])
+                await self.activity.report(
+                    "error",
+                    record["job"],
+                    status="error",
+                    detail="本次沟通未完成，请在投递历史中核对",
+                )
             return self.repository.application(key)
 
     async def verify_application(self, key):
@@ -197,6 +234,7 @@ class RecruitmentService:
         self.running()
         record = self.repository.application(key)
         job = Job.model_validate(record["job"])
+        await self.activity.report("verifying", job)
         # 真实平台写入必须先有已验证的专用适配器；不把通用正文读取当成可投递。
         if job.platform not in {"mock", "boss"}:
             raise ValueError("该平台投递适配器尚未验证，请手动沟通")
@@ -254,6 +292,7 @@ class RecruitmentService:
         if record["status"] != "APPROVED":
             raise ValueError("沟通状态异常，禁止重复执行")
         self.set_status(key, "CONTACTING", contact_attempt_at=now())
+        await self.activity.report("contacting", record["job"])
         page = await self.rpc.execute("CONTACT_HR", self.payload(key))
         if (
             not page.operation
@@ -270,6 +309,7 @@ class RecruitmentService:
         if record["status"] != "CONTACTED":
             raise ValueError("尚未确认目标会话")
         self.set_status(key, "SENDING")
+        await self.activity.report("sending", record["job"])
         page = await self.rpc.execute("SEND_GREETING", self.payload(key))
         if (
             not page.operation
@@ -292,3 +332,4 @@ class RecruitmentService:
                 "messages": [x.model_dump() for x in page.messages],
             },
         )
+        await self.activity.report("sent", record["job"], status="done")

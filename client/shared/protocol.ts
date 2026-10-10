@@ -11,13 +11,28 @@ export interface PageState {
   canBack: boolean;
   canForward: boolean;
 }
-// running 只表示协调流程已恢复，当前阶段仍是手动模式，不会自动投递。
+// running 只表示允许执行；实际正在做什么由 activity 描述。
 // revision 是状态修订号，page 是后端最近接收的页面地址与标题。
 export interface AgentState {
   status: 'paused' | 'running';
   mode: 'manual' | 'copilot' | 'auto';
   revision: number;
   page: { url: string; title: string };
+  activity?: AgentActivity;
+}
+// 操作摘要通过现有 WebSocket 推送，避免前端用定时动画猜测执行阶段。
+export interface AgentActivity {
+  stage: string;
+  label: string;
+  status: 'working' | 'waiting' | 'done' | 'error';
+  detail: string;
+  company: string;
+  title: string;
+  updated_at: string;
+  current_index?: number;
+  total?: number;
+  sent_count?: number;
+  target_count?: number;
 }
 export interface LogEntry {
   id: string;

@@ -1,5 +1,7 @@
 """Phase 6 工作台接口，所有请求均由服务校验本地认证令牌。"""
 
+from typing import Literal
+
 from fastapi import APIRouter, Header
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -12,6 +14,8 @@ class QueueRequest(BaseModel):
     job_urls: list[str] = Field(default_factory=list, max_length=100)
     review_each: bool = False
     target_count: int = Field(default=20, ge=1, le=100)
+    source: Literal["selected", "search"] = "selected"
+    max_search_pages: int = Field(default=10, ge=1, le=30)
 
 
 class ReviewRequest(BaseModel):
@@ -59,6 +63,8 @@ def console_router(service):
             value.job_urls,
             value.review_each,
             value.target_count,
+            value.source,
+            value.max_search_pages,
         )
 
     @router.post("/auto/review")

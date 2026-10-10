@@ -1,8 +1,50 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { executeBrowserCommand } from '../dist-electron/electron/browser/rpc.js';
+import { searchJobs } from '../dist-electron/electron/browser/search-rpc.js';
 
 const origin = 'http://127.0.0.1:8765';
+
+test('自主搜索仅接受受限参数，暂停时不导航，过期页面不返回候选', async () => {
+  let url = 'https://www.zhipin.com/web/geek/job';
+  let calls = 0;
+  let stale = false;
+  let revision = 0;
+  const target = {
+    navigate: async (value) => {
+      url = value;
+      calls++;
+    },
+    getUrl: async () => url,
+    getRevision: () => revision,
+    evaluate: async () => {
+      if (stale) revision++;
+      return { url, kind: 'job_list', jobs: [] };
+    },
+  };
+  for (const payload of [
+    { keyword: 'Go', page: 1, url: 'https://evil.test' },
+    { keyword: 'Go', page: 0 },
+    { keyword: 'Go', page: 31 },
+    { keyword: '', page: 1 },
+  ]) {
+    expectFailure(await searchJobs(target, { request_id: 'test', payload }, () => true));
+  }
+  const message = { request_id: 'test', payload: { keyword: 'Go & Java', page: 2 } };
+  expectFailure(await searchJobs(target, message, () => false));
+  assert.equal(calls, 0);
+  const valid = await searchJobs(target, message, () => true);
+  assert.equal(valid.success, true);
+  assert.equal(new URL(url).searchParams.get('query'), 'Go & Java');
+  assert.equal(new URL(url).searchParams.get('page'), '2');
+  stale = true;
+  expectFailure(await searchJobs(target, message, () => true));
+});
+
+function expectFailure(result) {
+  assert.equal(result.success, false);
+  assert.equal(result.error.code, 'SEARCH_FAILED');
+}
 const command = {
   type: 'browser_command',
   request_id: 'test',

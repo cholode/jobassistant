@@ -1,5 +1,6 @@
 // Phase 6 工作台：持久历史、统计、自动队列、聊天快照和执行追踪。
 import { useCallback, useEffect, useState } from 'react';
+import type { AgentState } from '../../../shared/protocol';
 import type {
   ApplicationRecord,
   RecruitmentAction,
@@ -41,12 +42,15 @@ interface ConsoleState {
 export function ConsolePanel({
   view,
   connected,
+  agent,
 }: {
   view: 'dashboard' | 'history' | 'chats' | 'traces' | 'model';
   connected: boolean;
+  agent?: AgentState;
 }) {
   const [state, setState] = useState<ConsoleState | null>(null);
   const [jobs, setJobs] = useState<RecruitmentState['jobs']>([]);
+  const [config, setConfig] = useState<RecruitmentState['config']>();
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -57,6 +61,7 @@ export function ConsolePanel({
     ]);
     setState(data as ConsoleState);
     setJobs((recruitment as RecruitmentState).jobs);
+    setConfig((recruitment as RecruitmentState).config);
   }, []);
   useEffect(() => {
     if (!connected) return;
@@ -111,6 +116,9 @@ export function ConsolePanel({
       )}
       {view === 'dashboard' && (
         <AutoQueuePanel
+          config={config}
+          connected={connected}
+          agent={agent}
           state={state.auto}
           jobs={jobs}
           applications={state.applications}

@@ -1,7 +1,5 @@
 import {
   Sparkles,
-  Pause,
-  Radio,
   Globe2,
   BriefcaseBusiness,
   ArrowUpRight,
@@ -16,6 +14,7 @@ import type { Snapshot } from '../../../shared/protocol';
 import { RecruitmentPanel } from '../jobs/RecruitmentPanel';
 import { ConsolePanel } from '../jobs/ConsolePanel';
 import { PageReader } from './PageReader';
+import { AgentActivityCard } from './AgentActivityCard';
 export type PanelTab =
   | 'overview'
   | 'activity'
@@ -35,7 +34,6 @@ interface Props {
 }
 export function AgentPanel({ data, tab, setTab, busy, run }: Props) {
   const connected = Boolean(data?.connected);
-  const running = data?.agent.status === 'running';
   const logs = data?.logs ?? [];
   const url = data?.browser.url ?? '';
   return (
@@ -48,8 +46,15 @@ export function AgentPanel({ data, tab, setTab, busy, run }: Props) {
           <strong>Agent Copilot</strong>
           <small>与你一起，找到更合适的工作</small>
         </div>
-        <span className="live-dot" />
+        <span className={`agent-badge ${connected ? 'online' : ''}`}>
+          <i />
+          {!connected ? '离线' : data?.agent.status === 'running' ? '已就绪' : '已暂停'}
+        </span>
       </div>
+      <AgentActivityCard
+        agent={data?.agent}
+        connected={connected}
+      />
       <div className="panel-tabs">
         <button
           className={tab === 'overview' ? 'chosen' : ''}
@@ -70,6 +75,7 @@ export function AgentPanel({ data, tab, setTab, busy, run }: Props) {
             key={tab}
             view={tab as 'dashboard' | 'history' | 'chats' | 'traces' | 'model'}
             connected={connected}
+            agent={data?.agent}
           />
         ) : tab === 'jobs' || tab === 'settings' ? (
           <RecruitmentPanel
@@ -79,24 +85,12 @@ export function AgentPanel({ data, tab, setTab, busy, run }: Props) {
           />
         ) : tab === 'overview' ? (
           <>
-            <div className={`agent-state-card ${running ? 'running' : ''}`}>
-              <div className="state-icon">
-                {running ? <Radio size={23} /> : <Pause size={22} />}
-              </div>
-              <span className="state-label">
-                {!connected ? '等待后端连接' : running ? '工作流已恢复' : 'Agent 已暂停'}
-              </span>
-              <p>
-                {running ? '连接与页面状态同步中。' : '放心浏览，网页现在由你接管。'}
-                <br />
-                {data?.agent.mode === 'auto'
-                  ? 'Auto 仅执行本次所选队列，不发送附件。'
-                  : 'Copilot 逐条确认沟通，不发送附件。'}
-              </p>
-              <span className="manual-pill">
-                <span /> {(data?.agent.mode || 'manual').toUpperCase()} MODE
-              </span>
-            </div>
+            <button
+              className="test-button"
+              onClick={() => setTab('dashboard')}
+            >
+              批量投递与任务进度
+            </button>
             <div className="section-caption">
               当前页面 <Globe2 size={14} />
             </div>

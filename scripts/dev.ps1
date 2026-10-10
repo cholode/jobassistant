@@ -9,32 +9,45 @@ $oldDevUrl = $env:JOB_AGENT_DEV_URL
 $oldElectronMode = $env:ELECTRON_RUN_AS_NODE
 New-Item -ItemType Directory -Force -Path (Join-Path $projectRoot 'logs') | Out-Null
 function Check-Exit { if ($LASTEXITCODE -ne 0) { throw "Command failed: $LASTEXITCODE" } }
-function Wait-Http($url, $process) {
+function Wait-Http($url, $process, $errorLog) {
     # 等待服务真正可用，而不是仅凭进程已启动就继续。
     for ($attempt = 0; $attempt -lt 60; $attempt++) {
-        if ($process.HasExited) { throw "Service exited. See logs/." }
+        if ($process.HasExited) {
+            $details = if (Test-Path -LiteralPath $errorLog) { Get-Content -LiteralPath $errorLog -Tail 15 | Out-String } else { 'No error log was created.' }
+            throw "Service exited (code $($process.ExitCode)): $url`nLog: $errorLog`n$details"
+        }
         try { $response = Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 1; if ($response.StatusCode -eq 200) { return } } catch {}
         Start-Sleep -Milliseconds 500
     }
-    throw "Service did not become ready: $url"
+    throw "Service did not become ready: $url`nLog: $errorLog"
 }
 try {
     # 开发模式使用固定端口，已被占用时停止，避免连接到另一实例。
-    foreach ($port in @(8765, 5173)) {
+    $ports = if ($Built) { @(8765) } else { @(8765, 5173) }
+    foreach ($port in $ports) {
         if (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) { throw "Port $port is occupied. Close the previous preview first." }
     }
+    # 先按锁文件同步虚拟环境，修复被移动/清理的解释器引用或缺失依赖。
+    # 在前端构建前验证 Python，环境故障不必等构建完成才发现。
+    if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+        throw 'uv is not available. Install uv and reopen PowerShell before starting the project.'
+    }
+    uv sync --project (Join-Path $projectRoot 'backend') --locked --inexact
+    Check-Exit
+    $python = Join-Path $projectRoot 'backend/.venv/Scripts/python.exe'
+    & $python -c 'import sys, uvicorn; print(sys.version)'
+    Check-Exit
     # 每次开发会话生成临时令牌，通过环境变量共享给桌面端和后端。
     $env:JOB_AGENT_TOKEN = [guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')
     Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
     Push-Location (Join-Path $projectRoot 'client')
     try { pnpm.cmd run build; Check-Exit } finally { Pop-Location }
-    $python = Join-Path $projectRoot 'backend/.venv/Scripts/python.exe'
     $backendProcess = Start-Process -FilePath $python -ArgumentList @('-m','uvicorn','app.main:create_app','--factory','--host','127.0.0.1','--port','8765') -WorkingDirectory (Join-Path $projectRoot 'backend') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $projectRoot 'logs/backend.log') -RedirectStandardError (Join-Path $projectRoot 'logs/backend-error.log')
-    Wait-Http 'http://127.0.0.1:8765/health' $backendProcess
+    Wait-Http 'http://127.0.0.1:8765/health' $backendProcess (Join-Path $projectRoot 'logs/backend-error.log')
     if (-not $Built) {
         $vite = Join-Path $projectRoot 'client/node_modules/vite/bin/vite.js'
         $viteProcess = Start-Process -FilePath (Get-Command node.exe).Source -ArgumentList @("`"$vite`"", '--host','127.0.0.1') -WorkingDirectory (Join-Path $projectRoot 'client') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $projectRoot 'logs/vite.log') -RedirectStandardError (Join-Path $projectRoot 'logs/vite-error.log')
-        Wait-Http 'http://127.0.0.1:5173' $viteProcess
+        Wait-Http 'http://127.0.0.1:5173' $viteProcess (Join-Path $projectRoot 'logs/vite-error.log')
         $env:JOB_AGENT_DEV_URL = 'http://127.0.0.1:5173'
     } else { Remove-Item Env:JOB_AGENT_DEV_URL -ErrorAction SilentlyContinue }
     Push-Location (Join-Path $projectRoot 'client')

@@ -42,7 +42,7 @@ export async function checkRecruitment(ui, web) {
     ),
   ).toBeUndefined();
   await expect(card.getByRole('button', { name: '确认沟通并发送此消息' })).toBeDisabled();
-  await ui.getByRole('combobox', { name: '运行模式' }).selectOption('copilot');
+  await ui.getByRole('button', { name: 'Copilot 智能协作' }).click();
   await expect
     .poll(() => ui.evaluate(() => window.desktop.snapshot().then((s) => s.agent.mode)))
     .toBe('copilot');

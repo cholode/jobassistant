@@ -4,6 +4,7 @@ import { BrowserError } from './BrowserController.js';
 import { executeBrowserCommand } from './rpc.js';
 import { executeApplicationCommand } from './application-rpc.js';
 import { openJob } from './navigation-rpc.js';
+import { searchJobs } from './search-rpc.js';
 import type { ApplicationPayload } from '../platforms/mock/MockApplicationAdapter.js';
 
 export class BrowserRPCBridge {
@@ -19,20 +20,22 @@ export class BrowserRPCBridge {
     if (typeof message.request_id !== 'string' || message.request_id.length > 100) return;
 
     const result =
-      String(message.command) === 'OPEN_JOB'
-        ? await openJob(this.browser, this.backend, message, this.canWrite)
-        : ['CONTACT_HR', 'SEND_GREETING'].includes(message.command)
-          ? await executeApplicationCommand(
-              this.browser,
-              this.backend,
-              message as unknown as {
-                request_id: string;
-                command: string;
-                payload: ApplicationPayload;
-              },
-              this.canWrite,
-            )
-          : await executeBrowserCommand(this.browser, this.backend, message);
+      String(message.command) === 'SEARCH_JOBS'
+        ? await searchJobs(this.browser, message, this.canWrite)
+        : String(message.command) === 'OPEN_JOB'
+          ? await openJob(this.browser, this.backend, message, this.canWrite)
+          : ['CONTACT_HR', 'SEND_GREETING'].includes(message.command)
+            ? await executeApplicationCommand(
+                this.browser,
+                this.backend,
+                message as unknown as {
+                  request_id: string;
+                  command: string;
+                  payload: ApplicationPayload;
+                },
+                this.canWrite,
+              )
+            : await executeBrowserCommand(this.browser, this.backend, message);
 
     // 结果只能回到发起请求的连接，不能误发给重连后的新会话。
     if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(result));

@@ -1,5 +1,5 @@
 import {
-  Command,
+  Bot,
   ChevronDown,
   Compass,
   BriefcaseBusiness,
@@ -8,6 +8,7 @@ import {
   History,
   Settings2,
   ShieldCheck,
+  Play,
 } from 'lucide-react';
 import type { PanelTab } from '../agent/AgentPanel';
 
@@ -22,10 +23,13 @@ export function Sidebar({ tab, setTab, logCount }: Props) {
     <aside className="sidebar">
       <div className="brand">
         <span className="brand-mark">
-          <Command size={23} />
+          <Bot
+            size={34}
+            strokeWidth={2.5}
+          />
         </span>
         <span>
-          Job Agent<small>你的求职副驾驶</small>
+          Job Agent<small>让好工作，主动找你</small>
         </span>
       </div>
       <div className="workspace">
@@ -38,7 +42,16 @@ export function Sidebar({ tab, setTab, logCount }: Props) {
       <div className="nav-label">工作台</div>
       <nav>
         <button
-          className="nav-item active"
+          className={`nav-item start-application ${tab === 'dashboard' ? 'selected' : ''}`}
+          aria-current={tab === 'dashboard' ? 'page' : undefined}
+          onClick={() => setTab('dashboard')}
+        >
+          <Play size={18} />
+          开始投递
+        </button>
+        <button
+          className={`nav-item ${tab === 'overview' ? 'active' : ''}`}
+          aria-current={tab === 'overview' ? 'page' : undefined}
           onClick={() => setTab('overview')}
         >
           <Compass size={18} />
@@ -48,13 +61,13 @@ export function Sidebar({ tab, setTab, logCount }: Props) {
         {[
           { icon: MessageSquare, text: '沟通消息', tab: 'chats' },
           { icon: SquareCheckBig, text: '投递历史与核对', tab: 'history' },
-          { icon: BriefcaseBusiness, text: '自动任务看板', tab: 'dashboard' },
           { icon: History, text: 'Agent 执行追踪', tab: 'traces' },
           { icon: Settings2, text: '模型设置', tab: 'model' },
         ].map(({ icon: Icon, text, tab: target }) => (
           <button
             key={target}
             className={`nav-item ${tab === target ? 'selected' : ''}`}
+            aria-current={tab === target ? 'page' : undefined}
             onClick={() => setTab(target as PanelTab)}
           >
             <Icon size={18} />
@@ -62,7 +75,8 @@ export function Sidebar({ tab, setTab, logCount }: Props) {
           </button>
         ))}
         <button
-          className="nav-item"
+          className={`nav-item ${tab === 'jobs' ? 'selected' : ''}`}
+          aria-current={tab === 'jobs' ? 'page' : undefined}
           onClick={() => setTab('jobs')}
         >
           <BriefcaseBusiness size={18} />
@@ -70,6 +84,7 @@ export function Sidebar({ tab, setTab, logCount }: Props) {
         </button>
         <button
           className={`nav-item ${tab === 'activity' ? 'selected' : ''}`}
+          aria-current={tab === 'activity' ? 'page' : undefined}
           onClick={() => setTab('activity')}
         >
           <History size={18} />
@@ -77,23 +92,17 @@ export function Sidebar({ tab, setTab, logCount }: Props) {
         </button>
       </nav>
       <div className="sidebar-bottom">
-        <div className="phase-card">
-          <div>
-            <span className="tiny-dot" /> PHASE 06 <span>已就绪</span>
-          </div>
-          <strong>有记录，可暂停，可核对。</strong>
-          <p>
-            浏览网页，连接后端，
+        <div className="sidebar-cheer">
+          <strong>
+            AI 与你一起
             <br />
-            随时暂停并接管。
-          </p>
-          <div className="phase-progress">
-            <i />
-          </div>
-          <small>自动任务与执行追踪</small>
+            找到更好的可能
+          </strong>
+          <span>Good Job! ✦</span>
         </div>
         <button
-          className="nav-item"
+          className={`nav-item ${tab === 'settings' ? 'selected' : ''}`}
+          aria-current={tab === 'settings' ? 'page' : undefined}
           onClick={() => setTab('settings')}
         >
           <Settings2 size={17} />
