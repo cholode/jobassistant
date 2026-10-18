@@ -849,3 +849,47 @@ summary:focus-visible {
     animation: none;
   }
 }
+
+/* Keep the drag target outside the native recruitment WebContentsView. */
+.work-area.resizable-work-area {
+  gap: 0;
+}
+.resizable-agent {
+  display: flex;
+  flex-shrink: 0;
+  min-height: 0;
+}
+.resizable-agent > .copilot {
+  width: 100%;
+}
+.browser-resizer {
+  width: 14px;
+  flex: 0 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  outline-offset: -3px;
+  border-radius: 6px;
+}
+.browser-resizer > span {
+  width: 4px;
+  height: 48px;
+  background: #b6ad95;
+  border-radius: 4px;
+  transition:
+    background 0.15s,
+    height 0.15s;
+}
+.browser-resizer:hover > span,
+.browser-resizer:focus-visible > span,
+.is-resizing .browser-resizer > span {
+  background: var(--blue);
+  height: 72px;
+}
+.is-resizing {
+  cursor: col-resize;
+  user-select: none;
+}

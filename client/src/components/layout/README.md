@@ -14,3 +14,5 @@ Sidebar Props：
 WorkspaceSummary 接收 connected 和 setTab，通过已有 console 接口读取 jobs / recommended / pending 统计；每次请求完成后等待 3 秒刷新，卸载时清理定时器，断线或失败不显示旧数字。彩色卡片导航至职位与投递面板。
 
 PanelTab 定义来自 [AgentPanel](../agent/README.md)，父层由 [App](../../README.md) 组装。
+
+ResizableWorkArea 接收 browser 和 panel 两个 ReactNode，在中间提供可拖拽分隔线。浏览器最小宽度 360px，Agent 面板最小宽度 310px；窗口缩小时自动限制面板宽度。双击或 Enter 恢复默认，左右方向键微调，Home/End 到达两端限制。通过指针捕获处理拖动结束和取消，原生网页继续由 useBrowserBounds 的 ResizeObserver 同步位置与尺寸。

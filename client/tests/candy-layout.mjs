@@ -81,6 +81,46 @@ try {
     expect(
       await ui.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     ).toBe(true);
+    const divider = ui.getByRole('separator', { name: '调整浏览器宽度' });
+    const handle = await divider.boundingBox();
+    await ui.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await ui.mouse.down();
+    await ui.mouse.move(handle.x + handle.width / 2 - 80, handle.y + handle.height / 2, {
+      steps: 10,
+    });
+    await ui.mouse.up();
+    await expect
+      .poll(async () => (await ui.locator('.copilot').boundingBox()).width)
+      .toBeGreaterThan(panel.width + 60);
+    await expect(ui.locator('.is-resizing')).toHaveCount(0);
+    // The embedded native view must track the DOM slot, not only the shell border.
+    await expect
+      .poll(async () => {
+        const slotBounds = await ui.locator('.browser-slot').boundingBox();
+        const native = await desktop.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows()[0].contentView.children[0].getBounds(),
+        );
+        return Math.max(
+          Math.abs(native.width - slotBounds.width),
+          Math.abs(native.x - slotBounds.x),
+        );
+      })
+      .toBeLessThanOrEqual(2);
+    await divider.focus();
+    await ui.keyboard.press('End');
+    expect(
+      (await ui.locator('.browser-card').boundingBox()).width,
+    ).toBeGreaterThanOrEqual(359);
+    await ui.keyboard.press('Home');
+    await expect
+      .poll(async () => (await ui.locator('.copilot').boundingBox()).width)
+      .toBe(310);
+    await divider.dblclick();
+    await expect
+      .poll(async () =>
+        Math.abs((await ui.locator('.copilot').boundingBox()).width - panel.width),
+      )
+      .toBeLessThanOrEqual(1);
     const image = await desktop.evaluate(async ({ BrowserWindow }) =>
       (await BrowserWindow.getAllWindows()[0].capturePage()).toPNG().toString('base64'),
     );

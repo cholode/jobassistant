@@ -6,6 +6,7 @@ import { BrowserPane } from './components/browser/BrowserPane';
 import { Sidebar } from './components/layout/Sidebar';
 import { AgentPanel, type PanelTab } from './components/agent/AgentPanel';
 import { WorkspaceSummary } from './components/layout/WorkspaceSummary';
+import { ResizableWorkArea } from './components/layout/ResizableWorkArea';
 
 export default function App() {
   const data = useDesktop();
@@ -104,19 +105,23 @@ export default function App() {
           connected={connected}
           setTab={setTab}
         />
-        <div className="work-area">
-          <BrowserPane
-            data={data}
-            run={run}
-          />
-          <AgentPanel
-            data={data}
-            tab={tab}
-            setTab={setTab}
-            busy={busy}
-            run={run}
-          />
-        </div>
+        <ResizableWorkArea
+          browser={
+            <BrowserPane
+              data={data}
+              run={run}
+            />
+          }
+          panel={
+            <AgentPanel
+              data={data}
+              tab={tab}
+              setTab={setTab}
+              busy={busy}
+              run={run}
+            />
+          }
+        />
         <footer className="statusbar">
           <span>
             <i className={connected ? 'status-green' : 'status-gray'} />
